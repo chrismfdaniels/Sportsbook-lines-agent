@@ -1,0 +1,17 @@
+# Python libraries and caches
+.venv/
+__pycache__/
+*.pyc
+
+# Your data: bets, line history, push subscriptions and the alert signing key
+data/
+
+# Secrets
+.env
+*.pem
+
+# Built Mac app (macapp/build.sh recreates it)
+macapp/build/
+
+# macOS
+.DS_Store

@@ -1,0 +1,59 @@
+/* Shared colors for every page: a 1970s Orange Crush look.
+   Royal blue and blaze orange on a warm cream, a helmet-stripe header, and
+   heavy condensed headings. Pages use only these variables for color. */
+:root {
+  --royal: #0b3a8f; --orange: #f5631a;
+  --bg: #f7f0e3; --card: #fffdf8; --text: #0f1e45; --muted: #5b6682; --line: #e4d8c2;
+  --accent: #0b3a8f; --accent-text: #ffffff;
+  --best-bg: #ddf3e0; --best-text: #1f6b32;
+  --live: #c2410c; --warn-bg: #ffe8d1; --warn-text: #8a3a06; --head: #f3eada;
+  --pos: #1f7a3a; --neg: #b42318; --grid: #efe6d6;
+  --display: "Futura-CondensedExtraBold", "Futura Condensed ExtraBold", "Avenir Next Condensed",
+             "Futura", "Arial Narrow", -apple-system, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --royal: #0b2f78; --orange: #ff7a2a;
+    --bg: #071330; --card: #0d1d44; --text: #f5eedf; --muted: #a7b2cb; --line: #1f3366;
+    --accent: #ff8a3d; --accent-text: #0a1838;
+    --best-bg: #12452a; --best-text: #b9f0c8;
+    --live: #ff8a3d; --warn-bg: #4a2108; --warn-text: #ffd9b0; --head: #122657;
+    --pos: #5dd48a; --neg: #ff7468; --grid: #17295a;
+    color-scheme: dark;
+  }
+}
+
+/* Header: royal blue with a white-orange-white helmet stripe underneath.
+   The controls inside read the header's own colors, so they sit on blue. */
+body > header {
+  background: var(--royal);
+  border-bottom: 0;
+  padding-top: env(safe-area-inset-top);
+  box-shadow: 0 2px 0 #fff, 0 7px 0 var(--orange), 0 9px 0 #fff;
+  margin-bottom: 9px;
+  --card: rgba(255, 255, 255, .1); --text: #ffffff; --muted: #c8d3ee; --line: rgba(255, 255, 255, .3);
+  --accent: #ff8a3d; --accent-text: #0a1838; --head: rgba(255, 255, 255, .08);
+  color: var(--text);
+}
+body > header option { color: #0f1e45; background: #fff; }
+body > header input::placeholder { color: #c8d3ee; }
+
+h1 {
+  font-family: var(--display);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  font-size: 22px;
+  line-height: 1;
+}
+body > header h1 { color: var(--orange); text-shadow: 1px 1px 0 #fff2; }
+
+/* An orange stripe across the top of the stat tiles */
+main .tile { border-top: 4px solid var(--orange); }
+
+:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+
+/* Desktop only (the Stats link): hidden on touch screens without a mouse or
+   trackpad, i.e. phones and tablets */
+@media (hover: none) and (pointer: coarse) { .desk-only { display: none !important; } }

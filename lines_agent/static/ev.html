@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>+EV Finder</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=2">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b3a8f">
+<link rel="stylesheet" href="/theme.css">
+<script src="/report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--card); border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top); }
+  .bar { max-width: 1100px; margin: 0 auto; padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; }
+  h1 { margin: 0 8px 0 0; }
+  a.back { color: var(--accent); text-decoration: none; font-weight: 600; }
+  #bank { width: 88px; background: transparent; }
+  label.f a { color: var(--accent); font-size: 13px; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; background: transparent; color: var(--text); padding: 7px 12px; font: inherit; font-weight: 600; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
+  .btn { border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 7px 12px; border-radius: 8px; font: inherit; cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  label.f { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+  label.f input, label.f select { width: 72px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); font: inherit; }
+  label.f select { width: auto; }
+  .status { max-width: 1100px; margin: 0 auto; padding: 0 16px 10px; color: var(--muted); font-size: 13px; }
+  .status b { color: var(--text); }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .warn { background: var(--warn-bg); color: var(--warn-text); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; }
+  .empty { color: var(--muted); text-align: center; padding: 48px 16px; }
+  .list { display: grid; gap: 10px; }
+  .bet { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .bet-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .pick { font-weight: 700; font-size: 15px; }
+  .ev { color: var(--best-text); background: var(--best-bg); font-weight: 800; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .meta { color: var(--muted); font-size: 12px; margin: 2px 0 10px; }
+  .nums { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .nums div { background: var(--head); border-radius: 8px; padding: 6px 8px; }
+  .nums span { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+  .nums b { font-size: 15px; font-variant-numeric: tabular-nums; }
+  .methods { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; font-size: 12px; }
+  .methods span { border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .methods span b { color: var(--text); font-weight: 600; }
+  .methods span.on { border-color: var(--accent); }
+  .methods span.neg b { color: var(--live); }
+  .sharp { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .sharp b { color: var(--text); font-weight: 600; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--warn-bg); color: var(--warn-text); margin-left: 6px; }
+  .bet-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; }
+  .bet-foot .sharp { margin-top: 0; }
+  .btn.done { color: var(--best-text); background: var(--best-bg); border-color: transparent; font-weight: 600; }
+  dialog.track { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); padding: 18px; width: min(420px, calc(100vw - 32px)); }
+  dialog.track::backdrop { background: rgba(0, 0, 0, .45); }
+  dialog.track h2 { font-size: 16px; margin: 0 0 4px; }
+  dialog.track .sub { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+  dialog.track .fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  dialog.track label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  dialog.track label.wide { grid-column: 1 / -1; }
+  dialog.track input { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); font: inherit; font-size: 16px; }
+  dialog.track .calc { margin: 12px 0 0; font-size: 13px; color: var(--muted); min-height: 18px; }
+  dialog.track .calc b { color: var(--text); }
+  dialog.track .err { color: var(--live); font-size: 13px; min-height: 18px; margin-top: 6px; }
+  dialog.track .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 14px; border-radius: 10px; font-size: 13px; z-index: 5; }
+  .toast a { color: inherit; font-weight: 700; }
+  details.how { margin-top: 20px; color: var(--muted); font-size: 13px; }
+  details.how summary { cursor: pointer; font-weight: 600; }
+  details.how code { background: var(--head); padding: 1px 4px; border-radius: 4px; }
+  .loading { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin-right: 6px; animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  @media (max-width: 700px) {
+    .bar { padding: 10px 12px; }
+    main { padding: 12px; }
+    .status { padding: 0 12px 8px; font-size: 12px; }
+    .nums { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .seg button { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="back" href="/">‹ Lines</a>
+    <h1>+EV Finder</h1>
+    <a class="back" href="/bets">History ›</a>
+    <a class="back" href="/live">Live ›</a>
+    <a class="back desk-only" href="/stats">Stats ›</a>
+    <div class="seg" role="group" aria-label="League" id="leagues"></div>
+    <div class="seg" role="group" aria-label="Market" id="markets"></div>
+    <label class="f">Min EV <input id="min" type="number" inputmode="decimal" step="0.5" min="0" max="50" value="5"> %</label>
+    <label class="f" title="Starting bankroll plus settled P&amp;L, from History">Bankroll $<input id="bank" type="number" readonly> <a href="/bets">change</a></label>
+    <label class="f">Method <select id="method">
+      <option value="multiplicative">Multiplicative</option>
+      <option value="shin">Shin</option>
+      <option value="power">Power</option>
+      <option value="all">All three must clear</option>
+    </select></label>
+    <label class="f">Sort <select id="sort"><option value="ev">EV</option><option value="start">Start time</option></select></label>
+    <button class="btn primary" id="refresh">Re-pull lines</button>
+  </div>
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+</header>
+<main>
+  <div id="warn"></div>
+  <div class="list" id="list"></div>
+  <details class="how">
+    <summary>How the fair price and EV are calculated</summary>
+    <ol>
+      <li>Each sharp price becomes an implied probability: <code>p = 1 / decimal odds</code>.</li>
+      <li>The vig is removed three ways, each sharp book on its own:
+        <ul>
+          <li><b>Multiplicative:</b> <code>fair = p<sub>side</sub> / (p<sub>side</sub> + p<sub>other</sub>)</code>. Every side gives up the same share of its probability, so the favorite absorbs most of the vig.</li>
+          <li><b>Shin:</b> models the book guarding against a share <i>z</i> of insiders and solves for <i>z</i>. It takes more vig off the longshot than multiplicative does.</li>
+          <li><b>Power:</b> <code>fair = p<sup>k</sup></code>, with <i>k</i> solved so the two sides sum to 1. It takes the most vig off the longshot.</li>
+        </ul>
+        Near even money the three agree. On big underdogs they can differ by 20+ points of EV, so a longshot that clears your minimum under every method (<b>All three must clear</b>) is the most trustworthy. The sharp books are then blended into a consensus by a weighted average of the books posting that exact market and number.</li>
+      <li>EV at your book: <code>EV = fair × decimal odds − 1</code>. Kelly fraction: <code>EV / (decimal − 1)</code>; the stake shown is ¼ Kelly of your bankroll.</li>
+    </ol>
+    <p>Spreads and totals are only compared at the same number as the sharp line. Pre-game only. An edge of 20% or more on a main line is tagged <b>CHECK</b>: it usually means a stale or mismatched price, so confirm it at the book before betting.</p>
+  </details>
+</main>
+<dialog class="track" id="trackDlg" aria-labelledby="trackTitle">
+  <form method="dialog" id="trackForm">
+    <h2 id="trackTitle">Track this bet</h2>
+    <div class="sub" id="trackSub"></div>
+    <div class="fields">
+      <label>Odds you got<input id="tOdds" inputmode="numeric" required></label>
+      <label>Stake $<input id="tStake" type="number" inputmode="decimal" step="0.01" min="0.01" required></label>
+      <label class="wide">Notes (optional)<input id="tNotes" maxlength="300" placeholder="e.g. bet slip ID"></label>
+    </div>
+    <div class="calc" id="tCalc"></div>
+    <div class="err" id="tErr" role="alert"></div>
+    <div class="foot"><button type="button" class="btn" id="tCancel">Cancel</button><button type="submit" class="btn primary" id="tOk">Confirm bet</button></div>
+  </form>
+</dialog>
+<script>
+// Every time on the page is US Mountain, whatever zone the device is in.
+const TZ = "America/Denver";
+// Safari says "Load failed" (Chrome "Failed to fetch") when the Mac can't be reached at all.
+const errText = (e) => e instanceof TypeError ? "Can't reach the Mac. It may be asleep or off, or the phone may be offline." : e.message;
+const LEAGUES = [["", "All"], ["NBA", "NBA"], ["NFL", "NFL"], ["NHL", "NHL"], ["NCAAF", "College FB"], ["NCAAB", "Men's CBB"], ["WNCAAB", "Women's CBB"]];
+const LEAGUE_SHORT = { NBA: "NBA", NFL: "NFL", NHL: "NHL", NCAAF: "College FB", NCAAB: "Men's CBB", WNCAAB: "Women's CBB" };
+const MARKETS = [["", "All"], ["moneyline", "ML"], ["spread", "Spread"], ["total", "Total"]];
+const MKT_NAME = { moneyline: "Moneyline", spread: "Spread", total: "Total" };
+const METHOD_NAME = { multiplicative: "Multiplicative", shin: "Shin", power: "Power", all: "All three" };
+const $ = (id) => document.getElementById(id);
+const st = { league: safeGet("ev.league", ""), market: safeGet("ev.market", ""), data: null, busy: false, shown: [], tracked: new Set() };
+
+function safeGet(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }
+function safeSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+const odds = (o) => (o > 0 ? "+" : "") + o;
+const fmtNum = (n) => (n > 0 ? "+" : "") + n;
+const nick = (team) => team.split(" ").slice(-1)[0];
+
+function ago(iso) {
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`;
+}
+function when(iso) {
+  return new Date(iso).toLocaleString("en-US", { timeZone: TZ, weekday: "short", hour: "numeric", minute: "2-digit" });
+}
+function pickText(b) {
+  if (b.market === "total") return `${b.side === "over" ? "Over" : "Under"} ${b.line}`;
+  const team = b.side === "away" ? b.away_team : b.home_team;
+  return b.market === "spread" ? `${team} ${fmtNum(b.line)}` : `${team} ML`;
+}
+function sharpText(b, bk, v) {
+  // Show both sides of the sharp market the way the book posts them.
+  const other = { away: "home", home: "away", over: "under", under: "over" }[b.side];
+  let a, o;
+  if (b.market === "total") { a = `${b.side[0].toUpperCase()} ${b.line}`; o = `${other[0].toUpperCase()} ${b.line}`; }
+  else if (b.market === "spread") { a = `${nick(b.side === "away" ? b.away_team : b.home_team)} ${fmtNum(b.line)}`; o = `${nick(other === "away" ? b.away_team : b.home_team)} ${fmtNum(-b.line)}`; }
+  else { a = nick(b.side === "away" ? b.away_team : b.home_team); o = nick(other === "away" ? b.away_team : b.home_team); }
+  return `<b>${esc(bk)}</b> ${esc(a)} ${odds(v.odds)} / ${esc(o)} ${odds(v.other_odds)} · vig ${v.vig_pct}% · ${METHOD_NAME[b.method].toLowerCase()} fair ${(v.fair_prob[b.method] * 100).toFixed(1)}%`;
+}
+
+function renderSegs() {
+  $("leagues").innerHTML = LEAGUES.map(([c, n]) => `<button data-league="${c}" aria-pressed="${st.league === c}">${n}</button>`).join("");
+  $("markets").innerHTML = MARKETS.map(([c, n]) => `<button data-market="${c}" aria-pressed="${st.market === c}">${n}</button>`).join("");
+}
+
+function render() {
+  renderSegs();
+  const d = st.data;
+  if (!d) return;
+  const bank = Math.max(0, parseFloat($("bank").value) || 0);
+  let bets = d.bets.filter((b) => (!st.league || b.league === st.league) && (!st.market || b.market === st.market));
+  if ($("sort").value === "start") bets = [...bets].sort((a, b) => a.start_time.localeCompare(b.start_time) || b.ev_pct - a.ev_pct);
+
+  // Leagues with no sharp lines can't produce any results; say so instead of looking empty.
+  const warns = [];
+  const noSharp = d.leagues.filter((lg) => d.scanned_at[lg] && !Object.values(d.sharp_lines[lg] || {}).some((n) => n));
+  if (noSharp.length) warns.push(`No sharp (${Object.keys(d.weights).join(", ")}) lines cached for ${noSharp.map((l) => LEAGUE_SHORT[l]).join(", ")}. Re-pull lines to fetch them, or the league may have no games posted.`);
+  for (const [k, v] of Object.entries(d.errors)) warns.push(`<b>${esc(k)}</b>: ${esc(v)}`);
+  $("warn").innerHTML = warns.length ? `<div class="warn">${warns.join("<br>")}</div>` : "";
+
+  if (!bets.length) {
+    $("list").innerHTML = `<div class="empty">No lines at your books with EV ≥ ${d.min_pct}% (${METHOD_NAME[d.method].toLowerCase()})${st.league ? " in " + LEAGUE_SHORT[st.league] : ""} right now. Edges this big on main lines are rare; lower Min EV to see the closest ones.</div>`;
+    return;
+  }
+  st.shown = bets;
+  $("list").innerHTML = bets.map((b, i) => {
+    const stake = bank * b.kelly_pct / 100 / 4;
+    const done = st.tracked.has(betKey(b));
+    return `<article class="bet">
+      <div class="bet-top"><div class="pick">${esc(pickText(b))}</div><div class="ev">+${b.ev_pct}%</div></div>
+      <div class="meta">${esc(LEAGUE_SHORT[b.league] || b.league)} · ${MKT_NAME[b.market]} · ${esc(b.away_team)} @ ${esc(b.home_team)} · ${when(b.start_time)}${b.check ? '<span class="tag">CHECK</span>' : ""}</div>
+      <div class="nums">
+        <div><span>${esc(b.book)}</span><b>${odds(b.odds)}</b></div>
+        <div><span>Fair · ${METHOD_NAME[b.method]}</span><b>${odds(b.fair_odds)}</b> <small>${(b.fair_prob * 100).toFixed(1)}%</small></div>
+        <div><span>Kelly</span><b>${b.kelly_pct}%</b></div>
+        <div><span>¼ Kelly stake</span><b>$${stake.toFixed(2)}</b></div>
+      </div>
+      <div class="methods">${Object.entries(b.methods).map(([m, v]) =>
+        `<span class="${m === b.method ? "on" : ""}${v.ev_pct < 0 ? " neg" : ""}">${METHOD_NAME[m]} <b>${v.ev_pct > 0 ? "+" : ""}${v.ev_pct}%</b> · fair ${odds(v.fair_odds)}</span>`).join("")}</div>
+      <div class="sharp">${Object.entries(b.sharp).map(([bk, v]) => sharpText(b, bk, v)).join("<br>")}</div>
+      <div class="bet-foot">
+        <div class="sharp">${esc(b.book)} line pulled ${ago(b.scraped_at)} · sharp ${ago(b.sharp_scraped_at)}</div>
+        <button class="btn ${done ? "done" : "primary"}" data-track="${i}">${done ? "Tracked ✓" : "Track bet"}</button>
+      </div>
+    </article>`;
+  }).join("");
+}
+
+// ---- Tracking a placed bet ----
+const betKey = (b) => [b.book, b.league, b.away_team, b.home_team, b.market, b.side, b.line ?? ""].join("|");
+function decimalOdds(o) { return o > 0 ? 1 + o / 100 : 1 + 100 / Math.abs(o); }
+function parseOdds(v) {
+  const s = String(v).trim().toUpperCase().replace("−", "-");
+  if (s === "EVEN" || s === "EV") return 100;
+  const n = Number(s.replace("+", ""));
+  return Number.isInteger(n) && Math.abs(n) >= 100 ? n : null;
+}
+let tracking = null;
+// EV at the odds actually taken: the card's EV rescaled from its price to yours
+const evAt = (evPct, cardOdds, o) => Math.round(((1 + evPct / 100) / decimalOdds(cardOdds) * decimalOdds(o) - 1) * 10000) / 100;
+function openTrack(b) {
+  tracking = b;
+  const bank = Math.max(0, parseFloat($("bank").value) || 0);
+  $("trackSub").textContent = `${pickText(b)} · ${b.book} · ${b.away_team} @ ${b.home_team} · ${when(b.start_time)}`;
+  $("tOdds").value = odds(b.odds);
+  $("tStake").value = (bank * b.kelly_pct / 100 / 4).toFixed(2);
+  $("tNotes").value = "";
+  $("tErr").textContent = "";
+  trackCalc();
+  $("trackDlg").showModal();
+  $("tStake").select();
+}
+function trackCalc() {
+  const o = parseOdds($("tOdds").value), s = parseFloat($("tStake").value);
+  if (!o || !(s > 0)) { $("tCalc").textContent = ""; return; }
+  const win = s * (decimalOdds(o) - 1);
+  const ev = evAt(tracking.ev_pct, tracking.odds, o);
+  $("tCalc").innerHTML = `To win <b>$${win.toFixed(2)}</b> · payout $${(s + win).toFixed(2)} · EV at these odds <b>${ev >= 0 ? "+" : ""}${ev.toFixed(2)}%</b>` +
+    (o !== tracking.odds ? ` (card had ${odds(tracking.odds)})` : "");
+}
+async function confirmTrack(e) {
+  e.preventDefault();
+  const o = parseOdds($("tOdds").value), s = parseFloat($("tStake").value);
+  if (!o) { $("tErr").textContent = "Enter American odds, like -110 or +150."; return; }
+  if (!(s > 0)) { $("tErr").textContent = "Enter the amount you bet."; return; }
+  const b = tracking;
+  const leg = {
+    book: b.book, odds: o, stake: s, pick: pickText(b),
+    league: b.league, away_team: b.away_team, home_team: b.home_team, start_time: b.start_time,
+    market: b.market, side: b.side, line: b.line, fair_odds: b.fair_odds, method: b.method,
+    ev_pct: evAt(b.ev_pct, b.odds, o), kelly_pct: b.kelly_pct,
+    methods: Object.fromEntries(Object.entries(b.methods).map(([m, v]) => [m, evAt(v.ev_pct, b.odds, o)])),
+  };
+  $("tOk").disabled = true;
+  try {
+    const r = await fetch("/api/bets", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "ev", legs: [leg], notes: $("tNotes").value }) });
+    const out = await r.json();
+    if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
+    st.tracked.add(betKey(b));
+    $("trackDlg").close();
+    render();
+    toast(`Tracked $${s.toFixed(2)} on ${pickText(b)} · <a href="/bets">History</a>`);
+  } catch (err) {
+    $("tErr").textContent = `Couldn't save: ${errText(err)}`;
+  } finally {
+    $("tOk").disabled = false;
+  }
+}
+function toast(html) {
+  const t = document.createElement("div");
+  t.className = "toast"; t.innerHTML = html;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 5000);
+}
+async function loadTracked() {
+  try {
+    const d = await (await fetch("/api/bets")).json();
+    st.tracked = new Set(d.bets.filter((b) => b.kind === "ev").map(betKey));
+    render();
+  } catch {}
+}
+$("trackForm").addEventListener("submit", confirmTrack);
+$("tCancel").addEventListener("click", () => $("trackDlg").close());
+$("tOdds").addEventListener("input", trackCalc);
+$("tStake").addEventListener("input", trackCalc);
+
+function renderStatus(msg) {
+  const d = st.data;
+  if (msg) { $("status").innerHTML = msg; return; }
+  if (!d) return;
+  const times = Object.values(d.scanned_at);
+  const oldest = times.length ? times.reduce((a, b) => (a < b ? a : b)) : null;
+  const sharpN = Object.values(d.sharp_lines).reduce((s, o) => s + Object.values(o).reduce((a, b) => a + b, 0), 0);
+  $("status").innerHTML = `<b>${d.bets.length}</b> line${d.bets.length === 1 ? "" : "s"} ≥ ${d.min_pct}% EV (${METHOD_NAME[d.method].toLowerCase()}) · consensus from ${Object.keys(d.weights).map(esc).join(", ")} (${sharpN} sharp prices) · ` +
+    (oldest ? `oldest league pull ${ago(oldest)}` : "nothing pulled yet");
+}
+
+async function load(refresh = false) {
+  if (st.busy) { st.again = true; return; }  // run again with the new settings once this one ends
+  st.busy = true;
+  $("refresh").disabled = true;
+  if (refresh) renderStatus(`<span class="loading"></span>Re-pulling NBA, NFL, NHL, college football and college basketball from every book (about a minute; up to ~18 Odds API credits)…`);
+  try {
+    const min = parseFloat($("min").value) || 0;
+    const r = await fetch(`/api/ev?min=${min}&method=${$("method").value || "all"}${refresh ? "&refresh=1" : ""}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    st.data = await r.json();
+    $("bank").value = st.data.bankroll.toFixed(2);
+    renderStatus();
+    render();
+  } catch (e) {
+    renderStatus(`Couldn't load: ${esc(errText(e))}${st.data ? " (showing the last result)" : ""}`);
+  } finally {
+    st.busy = false;
+    $("refresh").disabled = false;
+    if (st.again) { st.again = false; load(); }
+  }
+}
+
+document.addEventListener("click", (e) => {
+  const lg = e.target.closest("[data-league]");
+  const mk = e.target.closest("[data-market]");
+  const tr = e.target.closest("[data-track]");
+  if (tr) openTrack(st.shown[+tr.dataset.track]);
+  if (lg) { st.league = lg.dataset.league; safeSet("ev.league", st.league); render(); }
+  if (mk) { st.market = mk.dataset.market; safeSet("ev.market", st.market); render(); }
+});
+$("refresh").addEventListener("click", () => load(true));
+$("min").addEventListener("change", () => { safeSet("ev.min", $("min").value); load(); });
+$("sort").addEventListener("change", () => { safeSet("ev.sort", $("sort").value); render(); });
+$("method").addEventListener("change", () => { safeSet("ev.method2", $("method").value); load(); });
+$("min").value = safeGet("ev.min", "5");
+$("sort").value = safeGet("ev.sort", "ev");
+$("method").value = safeGet("ev.method2", "all");
+if (!$("method").value) $("method").value = "all";
+renderSegs();
+renderStatus(`<span class="loading"></span>Loading…`);
+load();
+loadTracked();
+// Scheduled runs refresh the cache on the Mac; pick that up every minute.
+setInterval(() => { if (!document.hidden) load(); }, 60000);
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+</script>
+</body>
+</html>

@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sportsbook Lines</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=2">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Lines">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b3a8f">
+<link rel="stylesheet" href="/theme.css">
+<script src="/report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--card); border-bottom: 1px solid var(--line); }
+  .bar { max-width: 1100px; margin: 0 auto; padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  h1 { margin: 0 8px 0 0; }
+  .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; background: transparent; color: var(--text); padding: 7px 16px; font: inherit; font-weight: 600; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
+  .btn { border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 7px 12px; border-radius: 8px; font: inherit; cursor: pointer; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  label.chk { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); cursor: pointer; }
+  input.search { border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 7px 10px; border-radius: 8px; font: inherit; min-width: 160px; }
+  .status { color: var(--muted); margin-left: auto; font-size: 13px; }
+  .layout { max-width: 1500px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
+  main { min-width: 0; }
+  aside { position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow-y: auto;
+          background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+  @media (max-width: 980px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    aside { position: static; max-height: none; order: -1; }
+  }
+  .pane-head { padding: 12px 14px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--card); }
+  .pane-head h2 { font-size: 15px; margin: 0 0 8px; }
+  .pane-ctrls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
+  .pane-ctrls input { width: 64px; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 5px 6px; border-radius: 6px; font: inherit; }
+  .pane-status { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .arb { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .arb:last-child { border-bottom: 0; }
+  .arb-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .arb-game { font-weight: 700; }
+  .arb-profit { color: var(--best-text); background: var(--best-bg); font-weight: 800; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .arb-meta { color: var(--muted); font-size: 12px; margin: 2px 0 8px; }
+  .arb table { min-width: 0; font-size: 13px; }
+  .arb td { padding: 4px 6px; text-align: right; }
+  .arb td:first-child { text-align: left; white-space: normal; }
+  .arb td { padding: 4px 4px; }
+  .arb-foot { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--warn-bg); color: var(--warn-text); margin-left: 6px; }
+  .badge.arbb { color: var(--best-text); background: var(--best-bg); padding: 1px 6px; border-radius: 4px; }
+  .pane-empty { padding: 20px 14px; color: var(--muted); font-size: 13px; }
+  .alerts { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+  .alerts:empty { display: none; }
+  .alerts .on { color: var(--best-text); background: var(--best-bg); font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  .btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  .updbar { max-width: 1500px; margin: 0 auto; padding: 0 16px 8px; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+  .updbar:empty { display: none; }
+  .updbar .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block; margin-right: 6px; }
+  .updbar.stale .dot { background: #f59e0b; }
+  .updbar.busy .dot { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
+  .updbar b { color: var(--text); }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .minp { display: inline-flex; align-items: center; gap: 6px; }
+  .stepper { display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .stepper .step { border: 0; background: var(--head); color: var(--text); font: inherit; font-size: 18px; font-weight: 700; width: 36px; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  .stepper .step:active { background: var(--line); }
+  .pane-ctrls .stepper input { border: 0; border-radius: 0; width: 56px; text-align: center; -moz-appearance: textfield; appearance: textfield; }
+  .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  @media (max-width: 700px) { .updbar { padding: 0 12px 8px; font-size: 12px; } .stepper .step { width: 44px; min-height: 42px; } }
+  details.props { border-top: 1px solid var(--line); }
+  details.props summary { padding: 10px 14px; cursor: pointer; font-weight: 600; color: var(--muted); }
+  .ptable td { white-space: nowrap; }
+  .ptable .pbook { font-size: 11px; color: var(--muted); font-weight: 400; }
+  .ptable tr.parb td { background: var(--best-bg); color: var(--best-text); }
+  @media (max-width: 700px) { .ptable .pbooks { display: none; } }
+  .linkbtn { border: 0; background: none; color: var(--accent); font: inherit; padding: 0; cursor: pointer; }
+  .warn { background: var(--warn-bg); color: var(--warn-text); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; }
+  .empty { color: var(--muted); text-align: center; padding: 48px 0; }
+  .game { background: var(--card); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+  .game-head { display: flex; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .teams { font-weight: 700; font-size: 15px; }
+  .when { color: var(--muted); font-size: 13px; }
+  .badge { color: var(--live); font-weight: 700; font-size: 12px; margin-left: 8px; letter-spacing: .04em; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 10px; text-align: center; border-top: 1px solid var(--line); white-space: nowrap; }
+  thead th { border-top: 0; background: var(--head); color: var(--muted); font-weight: 600; font-size: 12px; }
+  thead tr.grp th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  th.book, td.book { text-align: left; font-weight: 600; }
+  td .ln { color: var(--muted); margin-right: 6px; }
+  td.best { background: var(--best-bg); color: var(--best-text); font-weight: 700; }
+  td.best .ln { color: inherit; }
+  td.na { color: var(--muted); }
+  .loading { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent);
+             border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---- Scan controls (toggle chips) and schedule editor ---- */
+  .ctl { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .ctl-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .ctl-head h2 { font-size: 15px; margin: 0; }
+  .ctl-group { margin-top: 10px; }
+  .ctl-label { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 5px; }
+  .ctl-label .linkbtn { font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1px solid var(--line); background: var(--bg); color: var(--muted); border-radius: 999px; padding: 5px 11px;
+          font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; user-select: none; -webkit-user-select: none; }
+  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .chip .api { font-size: 9px; font-weight: 800; vertical-align: 2px; margin-left: 3px; opacity: .75; }
+  .est { margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .est b { color: var(--text); }
+  .est .warnt { color: var(--warn-text); background: var(--warn-bg); border-radius: 4px; padding: 1px 6px; display: inline-block; margin-top: 4px; }
+  .ctl.collapsed .ctl-body { display: none; }
+  dialog.sched { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); padding: 0;
+                 width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
+  dialog.sched::backdrop { background: rgba(0, 0, 0, .45); }
+  .sched-head, .sched-foot { padding: 14px 16px; display: flex; gap: 8px; align-items: center; }
+  .sched-head { border-bottom: 1px solid var(--line); justify-content: space-between; }
+  .sched-head h2 { font-size: 16px; margin: 0; }
+  .sched-foot { border-top: 1px solid var(--line); justify-content: flex-end; position: sticky; bottom: 0; background: var(--card); }
+  .sched-foot .note { margin-right: auto; font-size: 12px; color: var(--muted); }
+  .run { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .run-top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .run-top input[type=time] { border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 5px 8px; border-radius: 6px; font: inherit; font-weight: 700; }
+  .run-sum { flex: 1; min-width: 180px; font-size: 13px; color: var(--muted); }
+  .run.off .run-sum, .run.off input[type=time] { opacity: .5; }
+  .run-body { margin-top: 4px; }
+  .run:not(.open) .run-body { display: none; }
+  .switch { position: relative; width: 38px; height: 22px; flex: none; }
+  .switch input { opacity: 0; width: 100%; height: 100%; margin: 0; position: absolute; cursor: pointer; z-index: 1; }
+  .switch span { position: absolute; inset: 0; background: var(--line); border-radius: 999px; transition: background .15s; }
+  .switch span::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+  .switch input:checked + span { background: var(--accent); }
+  .switch input:checked + span::after { transform: translateX(16px); }
+  .switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---- Phone layout: bottom tabs (Lines / Arbitrage), one market at a time ---- */
+  .tabbar, .mkt { display: none; }
+  header { padding-top: env(safe-area-inset-top); }
+  @media (max-width: 700px) {
+    body { font-size: 15px; padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+    .bar { padding: 10px 12px; gap: 8px; }
+    h1 { font-size: 17px; flex: 1; }
+    .status { margin-left: 0; width: 100%; font-size: 12px; }
+    .seg { order: 5; width: 100%; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .seg::-webkit-scrollbar { display: none; }
+    .seg button { flex: 0 0 auto; padding: 8px 14px; }
+    .mkt { display: inline-flex; order: 6; width: 100%; }
+    .mkt button { flex: 1; }
+    label.chk { order: 7; font-size: 13px; }
+    input.search { order: 8; flex: 1; min-width: 0; font-size: 16px; } /* 16px stops iOS zooming on focus */
+    .pane-ctrls input { font-size: 16px; }
+    .layout { padding: 10px; gap: 10px; }
+    aside { border-radius: 10px; }
+    body[data-view="lines"] aside, body[data-view="arbs"] main { display: none; }
+    table { min-width: 0; }
+    th, td { padding: 8px 6px; }
+    thead th { white-space: normal; }
+    body[data-market="moneyline"] .c-spread, body[data-market="moneyline"] .c-total,
+    body[data-market="spread"] .c-moneyline, body[data-market="spread"] .c-total,
+    body[data-market="total"] .c-moneyline, body[data-market="total"] .c-spread { display: none; }
+    th.book, td.book { width: 34%; }
+    .tabbar { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 3; background: var(--card);
+              border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+    .tabbar button { flex: 1; border: 0; background: transparent; color: var(--muted); font: inherit; font-weight: 600;
+                     padding: 12px 0 14px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .tabbar button[aria-pressed="true"] { color: var(--accent); }
+    .tabbar .count { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--best-bg); color: var(--best-text); font-size: 11px; }
+  }
+  .arb-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .btn.done { color: var(--best-text); background: var(--best-bg); border-color: transparent; font-weight: 600; }
+  dialog.track { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); padding: 18px; width: min(460px, calc(100vw - 32px)); }
+  dialog.track::backdrop { background: rgba(0, 0, 0, .45); }
+  dialog.track h2 { font-size: 16px; margin: 0 0 4px; }
+  dialog.track .sub { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  dialog.track .leg { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+  dialog.track .leg-title { font-weight: 600; font-size: 13px; margin-bottom: 8px; }
+  dialog.track .fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  dialog.track label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  dialog.track input { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); font: inherit; font-size: 16px; }
+  dialog.track .calc { font-size: 13px; color: var(--muted); min-height: 18px; }
+  dialog.track .calc b { color: var(--text); }
+  dialog.track .err { color: var(--live); font-size: 13px; min-height: 18px; margin-top: 6px; }
+  dialog.track .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+  .toast { position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 14px; border-radius: 10px; font-size: 13px; z-index: 5; }
+  .toast a { color: inherit; font-weight: 700; }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>Sportsbook Lines</h1>
+    <div class="seg" role="group" aria-label="League" id="leagues"></div>
+    <div class="seg mkt" role="group" aria-label="Market" id="markets">
+      <button data-market="moneyline">Moneyline</button>
+      <button data-market="spread">Spread</button>
+      <button data-market="total">Total</button>
+    </div>
+    <button class="btn" id="refresh">Refresh</button>
+    <label class="chk"><input type="checkbox" id="live"> Show live games</label>
+    <input class="search" id="search" type="search" placeholder="Filter teams…">
+    <a class="btn" href="/ev" style="text-decoration:none">+EV Finder</a>
+    <a class="btn" href="/bets" style="text-decoration:none">History</a>
+    <a class="btn" href="/live" style="text-decoration:none">Live</a>
+    <a class="btn desk-only" href="/stats" style="text-decoration:none">Stats</a>
+    <span class="status" id="status"></span>
+  </div>
+  <div class="updbar" id="updated" role="status" aria-live="polite"></div>
+</header>
+<div class="layout">
+  <main id="main"></main>
+  <aside aria-label="Arbitrage opportunities">
+    <section class="ctl" id="ctl" aria-label="Scan controls">
+      <div class="ctl-head"><h2>Scan controls</h2><button class="linkbtn" id="ctlToggle" aria-expanded="true">Hide</button></div>
+      <div class="ctl-body">
+        <div id="ctlGroups"></div>
+        <div class="est" id="est"></div>
+      </div>
+    </section>
+    <div class="pane-head">
+      <h2>Arbitrage · Lines &amp; Player Props</h2>
+      <div class="pane-ctrls">
+        <span class="minp">Min profit
+          <span class="stepper">
+            <button type="button" class="step" data-step="-0.1" aria-label="Lower min profit by 0.1%">−</button>
+            <input id="arbMin" type="number" inputmode="decimal" step="0.1" min="-5" max="20" value="1.0" aria-label="Min profit percent">
+            <button type="button" class="step" data-step="0.1" aria-label="Raise min profit by 0.1%">+</button>
+          </span> %</span>
+        <label title="Starting bankroll plus settled P&amp;L, from History">Bankroll $<input id="arbBank" type="number" readonly style="width:88px;background:transparent"> <a href="/bets" style="color:var(--accent);font-size:13px">change</a></label>
+        <button class="btn primary" id="arbScan">Scan selected</button>
+      </div>
+      <div class="pane-status" id="arbStatus"></div>
+      <div class="pane-status"><span id="schedStatus"></span> · <button class="linkbtn" id="schedEdit">Edit schedule</button></div>
+      <div class="alerts" id="alerts"></div>
+    </div>
+    <div id="arbList"></div>
+  </aside>
+</div>
+<dialog class="sched" id="schedDlg" aria-labelledby="schedTitle">
+  <div class="sched-head"><h2 id="schedTitle">Scheduled scans (US Mountain)</h2><button class="btn" id="schedAdd">Add run</button></div>
+  <div id="schedRuns"></div>
+  <div class="sched-foot"><span class="note" id="schedNote"></span><button class="btn" id="schedCancel">Cancel</button><button class="btn primary" id="schedSave">Save</button></div>
+</dialog>
+<dialog class="track" id="arbDlg" aria-labelledby="arbDlgTitle">
+  <form method="dialog" id="arbForm">
+    <h2 id="arbDlgTitle">Track this arbitrage</h2>
+    <div class="sub" id="arbDlgSub"></div>
+    <div id="arbLegs"></div>
+    <div class="calc" id="arbCalc"></div>
+    <label style="margin-top:10px">Notes (optional)<input id="arbNotes" maxlength="300" placeholder="e.g. bet slip IDs"></label>
+    <div class="err" id="arbErr" role="alert"></div>
+    <div class="foot"><button type="button" class="btn" id="arbCancel">Cancel</button><button type="submit" class="btn primary" id="arbOk">Confirm both bets</button></div>
+  </form>
+</dialog>
+<nav class="tabbar" aria-label="View">
+  <button data-view="lines">Lines</button>
+  <button data-view="arbs">Arbitrage <span class="count" id="arbCount" hidden></span></button>
+</nav>
+
+<script>
+// Every time on the page is US Mountain, whatever zone the device is in.
+const TZ = "America/Denver";
+// Safari says "Load failed" (Chrome "Failed to fetch") when the Mac can't be reached at all.
+const errText = (e) => e instanceof TypeError ? "Can't reach the Mac. It may be asleep or off, or the phone may be offline." : e.message;
+const mtTime = (iso) => new Date(iso).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" });
+const mtDay = (d) => d.toLocaleDateString("en-US", { timeZone: TZ });
+// "1:05 PM MT" today, "Wed 1:05 PM MT" on another day
+const mtWhen = (iso) => (mtDay(new Date()) === mtDay(new Date(iso)) ? "" : new Date(iso).toLocaleDateString("en-US", { timeZone: TZ, weekday: "short" }) + " ") + mtTime(iso) + " MT";
+const BOOKS = ["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "BetRivers", "theScore Bet"];
+// [code, button label, full name]
+const LEAGUES = [
+  ["NBA", "NBA", "NBA"],
+  ["NFL", "NFL", "NFL"],
+  ["NHL", "NHL", "NHL"],
+  ["MLB", "MLB", "MLB"],
+  ["NCAAF", "College FB", "College Football"],
+  ["NCAAB", "Men's CBB", "Men's College Basketball"],
+  ["WNCAAB", "Women's CBB", "Women's College Basketball"],
+  ["NCAABASE", "College BSB", "College Baseball"],
+];
+const LEAGUE_NAME = Object.fromEntries(LEAGUES.map(([c, , n]) => [c, n]));
+const LEAGUE_SHORT = Object.fromEntries(LEAGUES.map(([c, s]) => [c, s]));
+document.getElementById("leagues").innerHTML = LEAGUES
+  .map(([c, s, n]) => `<button data-league="${c}" title="${n}">${s}</button>`).join("");
+const COLS = [
+  ["moneyline", "away"], ["moneyline", "home"],
+  ["spread", "away"], ["spread", "home"],
+  ["total", "over"], ["total", "under"],
+];
+const state = { league: "NBA", data: null, loading: false };
+const $ = (id) => document.getElementById(id);
+
+function safeGet(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }
+function safeSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+
+const fmtOdds = (o) => (o > 0 ? "+" + o : String(o));
+function fmtLine(l) {
+  if (l.line == null) return "";
+  if (l.market === "spread") return (l.line > 0 ? "+" : "") + l.line;
+  return (l.side === "over" ? "O " : "U ") + l.line;
+}
+function better(a, b) {
+  if (a.market !== "moneyline" && a.line !== b.line) {
+    if (a.market === "spread" || a.side === "under") return a.line > b.line;
+    return a.line < b.line; // over: a lower total is better
+  }
+  return a.odds > b.odds;
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+function groupGames(lines) {
+  const games = new Map(), now = Date.now();
+  for (const l of lines) {
+    const key = [l.away_team, l.home_team, l.start_time.slice(0, 10)].join("|").toLowerCase();
+    let g = games.get(key);
+    if (!g) games.set(key, g = { away: l.away_team, home: l.home_team, start: l.start_time, live: false, cells: {} });
+    // Cached lines can be from before the game started and still say live: false.
+    g.live = g.live || l.live || new Date(l.start_time).getTime() <= now;
+    if (l.start_time < g.start) g.start = l.start_time;
+    g.cells[`${l.book}|${l.market}|${l.side}`] = l;
+  }
+  return [...games.values()].sort((a, b) => a.start.localeCompare(b.start));
+}
+
+function render() {
+  const main = $("main");
+  const d = state.data;
+  if (!d) { main.innerHTML = ""; return; }
+  const showLive = $("live").checked;
+  const q = $("search").value.trim().toLowerCase();
+  const playerHit = (g) => [...(propsByGame.get(gameKey(d.league, g.away, g.home))?.values() || [])]
+    .some((r) => r.player.toLowerCase().includes(q));
+  let games = groupGames(d.lines).filter((g) => (showLive || !g.live) &&
+    (!q || (g.away + " " + g.home).toLowerCase().includes(q) || playerHit(g)));
+
+  let html = "";
+  const errs = Object.entries(d.errors || {});
+  if (errs.length) html += `<div class="warn">${errs.map(([k, v]) => `<b>${esc(LEAGUE_NAME[k] || k)}</b>: ${esc(v)}`).join("<br>")}</div>`;
+  if (!games.length) html += `<div class="empty">No ${showLive ? "" : "upcoming "}${esc(LEAGUE_NAME[d.league])} games with lines right now.${showLive ? "" : " Try “Show live games”."}</div>`;
+
+  for (const g of games) {
+    const books = BOOKS.filter((b) => COLS.some(([m, s]) => g.cells[`${b}|${m}|${s}`]));
+    const best = {};
+    for (const [m, s] of COLS) for (const b of books) {
+      const l = g.cells[`${b}|${m}|${s}`];
+      if (l && (!best[m + s] || better(l, best[m + s]))) best[m + s] = l;
+    }
+    const when = new Date(g.start).toLocaleString("en-US", { timeZone: TZ, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    html += `<section class="game">
+      <div class="game-head"><span class="teams">${esc(g.away)} @ ${esc(g.home)}${g.live ? '<span class="badge">LIVE</span>' : ""}${arbGames.has(gameKey(d.league, g.away, g.home)) ? '<span class="badge arbb">ARB</span>' : ""}</span><span class="when">${when}</span></div>
+      <div class="scroll"><table>
+        <thead>
+          <tr class="grp"><th></th><th colspan="2" class="c-moneyline">Moneyline</th><th colspan="2" class="c-spread">Spread</th><th colspan="2" class="c-total">Total</th></tr>
+          <tr><th class="book">Book</th><th class="c-moneyline">${esc(g.away)}</th><th class="c-moneyline">${esc(g.home)}</th><th class="c-spread">${esc(g.away)}</th><th class="c-spread">${esc(g.home)}</th><th class="c-total">Over</th><th class="c-total">Under</th></tr>
+        </thead><tbody>`;
+    for (const b of books) {
+      html += `<tr><td class="book">${esc(b)}</td>`;
+      for (const [m, s] of COLS) {
+        const l = g.cells[`${b}|${m}|${s}`];
+        if (!l) { html += `<td class="na c-${m}">–</td>`; continue; }
+        const isBest = books.length > 1 && best[m + s] && best[m + s].line === l.line && best[m + s].odds === l.odds;
+        const ln = fmtLine(l);
+        html += `<td class="c-${m}${isBest ? " best" : ""}">${ln ? `<span class="ln">${esc(ln)}</span>` : ""}${fmtOdds(l.odds)}</td>`;
+      }
+      html += `</tr>`;
+    }
+    html += `</tbody></table></div>${propsBlock(propsByGame.get(gameKey(d.league, g.away, g.home)), q)}</section>`;
+  }
+  main.innerHTML = html;
+}
+
+// ---- Basketball player props, shown under each game ----
+const PROP_LEAGUES = ["NBA", "NCAAB", "WNCAAB"];
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const playerKey = (n) => n.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase()
+  .replace(/[.'’,-]/g, " ").split(/\s+/).filter((w) => w && !["jr", "sr", "ii", "iii", "iv"].includes(w)).join(" ");
+let propsByGame = new Map();
+let propArbKeys = new Set();
+
+function indexProps(list) {
+  propsByGame = new Map();
+  for (const p of list) {
+    const gk = gameKey(p.league, p.away_team, p.home_team);
+    if (!propsByGame.has(gk)) propsByGame.set(gk, new Map());
+    const rows = propsByGame.get(gk);
+    const rk = playerKey(p.player) + "|" + p.stat;
+    if (!rows.has(rk)) rows.set(rk, { player: p.player, stat: p.stat, over: null, under: null, books: new Set() });
+    const row = rows.get(rk);
+    row.books.add(p.book);
+    // Show the regular O/U lines; an "N+" milestone only when a player has no O/U.
+    // (The arbitrage scan still uses milestones.) Best over = lowest line, then
+    // best price; best under = highest line, then best price.
+    const cur = row[p.side];
+    const wins = !cur || (cur.milestone && !p.milestone) || (cur.milestone === p.milestone &&
+      (p.line !== cur.line ? (p.side === "over" ? p.line < cur.line : p.line > cur.line) : p.odds > cur.odds));
+    if (wins) row[p.side] = p;
+  }
+}
+
+function propCell(p) {
+  if (!p) return `<td class="na">–</td>`;
+  const label = p.milestone ? `${p.line + 0.5}+` : `${p.side === "over" ? "O" : "U"} ${p.line}`;
+  return `<td><span class="ln">${label}</span>${fmtOdds(p.odds)}<div class="pbook">${esc(p.book)}</div></td>`;
+}
+
+function propsBlock(rows, q) {
+  if (!rows || !rows.size) return "";
+  let list = [...rows.values()].sort((a, b) => a.player.localeCompare(b.player) || a.stat.localeCompare(b.stat));
+  // A search that names a player narrows the list; a team search keeps everyone.
+  const named = q ? list.filter((r) => r.player.toLowerCase().includes(q)) : [];
+  if (named.length) list = named;
+  const books = new Set(list.flatMap((r) => [...r.books]));
+  const arbHere = list.some((r) => propArbKeys.has(playerKey(r.player) + "|" + r.stat));
+  return `<details class="props"${q || arbHere ? " open" : ""}>
+    <summary>Player props · ${list.length} player lines from ${books.size} book${books.size === 1 ? "" : "s"}${arbHere ? ' <span class="badge arbb">ARB</span>' : ""}</summary>
+    <div class="scroll"><table class="ptable"><thead><tr><th class="book">Player</th><th>Stat</th><th>Best over</th><th>Best under</th><th class="pbooks">Books</th></tr></thead><tbody>
+    ${list.map((r) => `<tr${propArbKeys.has(playerKey(r.player) + "|" + r.stat) ? ' class="parb"' : ""}>
+      <td class="book">${esc(r.player)}</td><td>${cap(r.stat)}</td>${propCell(r.over)}${propCell(r.under)}<td class="pbooks">${r.books.size}</td></tr>`).join("")}
+    </tbody></table></div></details>`;
+}
+
+async function loadProps(league) {
+  if (!PROP_LEAGUES.includes(league)) { indexProps([]); return; }
+  try {
+    const d = await (await fetch(`/api/props?league=${league}`)).json();
+    if (league === state.league) indexProps(d.props || []);
+  } catch { if (league === state.league) indexProps([]); }
+}
+
+async function load(refresh = false) {
+  state.loading = true;
+  $("refresh").disabled = true;
+  const nb = refresh ? ctl.manual.books.length : BOOKS.length;
+  $("status").innerHTML = `<span class="loading"></span>Pulling ${esc(LEAGUE_NAME[state.league])} lines from ${nb} book${nb === 1 ? "" : "s"}…`;
+  const league = state.league;
+  try {
+    // A refresh pulls only the books and markets switched on in Scan controls.
+    const scope = refresh ? `&refresh=1&books=${ctl.manual.books.join(",")}${ctl.manual.markets.length ? "&markets=" + ctl.manual.markets.join(",") : ""}` : "";
+    const [r] = await Promise.all([fetch(`/api/lines?league=${league}${scope}`), loadProps(league)]);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || r.statusText);
+    if (league !== state.league) return; // user switched leagues mid-request
+    state.data = d;
+    const at = mtTime(d.scraped_at) + " MT";
+    $("status").textContent = `${d.lines.length} lines · updated ${at}`;
+    render();
+    renderUpdated();
+  } catch (e) {
+    if (league === state.league) $("status").textContent = "Error: " + errText(e);
+  } finally {
+    if (league === state.league) { state.loading = false; $("refresh").disabled = false; }
+  }
+}
+
+// ---- Arbitrage pane ----
+let arbGames = new Set();
+const gameKey = (lg, away, home) => [lg, away, home].join("|").toLowerCase();
+
+function renderArbs(d) {
+  lastArbs = d;
+  const list = $("arbList");
+  $("arbCount").hidden = !d.arbs.length;
+  $("arbCount").textContent = d.arbs.length;
+  arbGames = new Set(d.arbs.map((a) => gameKey(a.league, a.away_team, a.home_team)));
+  propArbKeys = new Set(d.arbs.filter((a) => a.market === "prop").map((a) => playerKey(a.player) + "|" + a.stat));
+  const errs = Object.entries(d.errors || {});
+  let html = errs.length ? `<div class="warn" style="margin:12px 14px">${errs.map(([k, v]) => `<b>${esc(k)}</b>: ${esc(v)}`).join("<br>")}</div>` : "";
+  if (!d.arbs.length) {
+    html += `<div class="pane-empty">No moneyline, total or player-prop pairing across books guarantees ≥ ${d.min_pct}% right now. Edges this size are rare and short-lived; lower the threshold to see the closest pairs.</div>`;
+  }
+  shownArbs = d.arbs;
+  for (const [ai, a] of d.arbs.entries()) {
+    const done = trackedArbs.has(arbKey(a));
+    const when = new Date(a.start_time).toLocaleString("en-US", { timeZone: TZ, weekday: "short", hour: "numeric", minute: "2-digit" });
+    const sideName = (s) => s === "away" ? a.away_team : s === "home" ? a.home_team : s === "over" ? "Over" : "Under";
+    const ret = a.legs[0].payout;
+    html += `<div class="arb">
+      <div class="arb-top"><span class="arb-game">${a.market === "prop" ? esc(a.player) + " · " + esc(cap(a.stat)) : esc(a.away_team) + " @ " + esc(a.home_team)}</span><span class="arb-profit">+${a.profit_pct.toFixed(2)}%</span></div>
+      <div class="arb-meta">${esc(LEAGUE_SHORT[a.league] || a.league)} · ${a.market === "prop" ? esc(a.away_team + " @ " + a.home_team) : a.market === "total" ? "Total" : "Moneyline"} · ${when}${a.middle ? '<span class="tag">MIDDLE</span>' : ""}${a.live ? '<span class="tag">LIVE</span>' : ""}</div>
+      <table><tbody>${a.legs.map((l) => `<tr>
+        <td>${l.milestone ? `${l.line + 0.5}+ (Yes)` : esc(sideName(l.side)) + (l.line != null ? " " + l.line : "")}</td>
+        <td><b>${fmtOdds(l.odds)}</b></td>
+        <td>${esc(l.book)}</td>
+        <td><b>$${l.stake.toFixed(2)}</b></td></tr>`).join("")}</tbody></table>
+      <div class="arb-foot">Either result returns ≈ $${ret.toFixed(2)} on $${a.bankroll.toFixed(0)}${a.middle ? ` — both win if the ${a.market === "prop" ? esc(a.stat) + " count" : "total"} lands between the lines` : ""}.</div>
+      <div class="arb-actions"><button class="btn ${done ? "done" : "primary"}" data-track-arb="${ai}">${done ? "Tracked ✓" : "Track arb"}</button></div>
+    </div>`;
+  }
+  list.innerHTML = html;
+}
+
+// ---- Tracking a placed arbitrage (both legs) ----
+let shownArbs = [], trackedArbs = new Set(), trackingArb = null;
+const arbKey = (a) => [a.league, a.away_team, a.home_team, a.market, a.player || "", a.stat || "",
+  ...a.legs.map((l) => `${l.book}:${l.side}:${l.line ?? ""}`).sort()].join("|");
+const legKey = (bet) => `${bet.book}:${bet.side}:${bet.line ?? ""}`;
+function decimalOdds(o) { return o > 0 ? 1 + o / 100 : 1 + 100 / Math.abs(o); }
+function parseOdds(v) {
+  const s = String(v).trim().toUpperCase().replace("−", "-");
+  if (s === "EVEN" || s === "EV") return 100;
+  const n = Number(s.replace("+", ""));
+  return Number.isInteger(n) && Math.abs(n) >= 100 ? n : null;
+}
+function legPick(a, l) {
+  if (a.market === "prop") return `${a.player} ${l.milestone ? `${l.line + 0.5}+ ${a.stat}` : `${cap(l.side)} ${l.line} ${a.stat}`}`;
+  if (a.market === "total") return `${cap(l.side)} ${l.line}`;
+  return `${l.side === "away" ? a.away_team : a.home_team} ML`;
+}
+function openArbTrack(a) {
+  trackingArb = a;
+  $("arbDlgSub").textContent = `${a.away_team} @ ${a.home_team} · ${a.market === "prop" ? a.player + " " + a.stat : cap(a.market)} · +${a.profit_pct.toFixed(2)}% on the card`;
+  $("arbLegs").innerHTML = a.legs.map((l, i) => `<div class="leg">
+    <div class="leg-title">${esc(legPick(a, l))} · ${esc(l.book)}</div>
+    <div class="fields">
+      <label>Odds you got<input data-leg-odds="${i}" inputmode="numeric" value="${fmtOdds(l.odds)}"></label>
+      <label>Stake $<input data-leg-stake="${i}" type="number" inputmode="decimal" step="0.01" min="0.01" value="${l.stake.toFixed(2)}"></label>
+    </div></div>`).join("");
+  $("arbNotes").value = ""; $("arbErr").textContent = "";
+  arbCalc();
+  $("arbDlg").showModal();
+}
+function arbLegsInput() {
+  return trackingArb.legs.map((l, i) => ({
+    odds: parseOdds(document.querySelector(`[data-leg-odds="${i}"]`).value),
+    stake: parseFloat(document.querySelector(`[data-leg-stake="${i}"]`).value),
+  }));
+}
+function arbCalc() {
+  const legs = arbLegsInput();
+  if (legs.some((l) => !l.odds || !(l.stake > 0))) { $("arbCalc").textContent = ""; return; }
+  const total = legs.reduce((s, l) => s + l.stake, 0);
+  const rets = legs.map((l) => l.stake * decimalOdds(l.odds));
+  const worst = Math.round((Math.min(...rets) - total) * 100) / 100 || 0;
+  $("arbCalc").innerHTML = `Total staked <b>$${total.toFixed(2)}</b> · returns $${rets.map((r) => r.toFixed(2)).join(" / ")} · guaranteed <b>${worst < 0 ? "−" : "+"}$${Math.abs(worst).toFixed(2)}</b> (${(worst / total * 100).toFixed(2)}%)`;
+}
+async function confirmArbTrack(e) {
+  e.preventDefault();
+  const a = trackingArb, inputs = arbLegsInput();
+  if (inputs.some((l) => !l.odds)) { $("arbErr").textContent = "Enter American odds for both legs, like -110 or +150."; return; }
+  if (inputs.some((l) => !(l.stake > 0))) { $("arbErr").textContent = "Enter the amount you bet on both legs."; return; }
+  const legs = a.legs.map((l, i) => ({
+    book: l.book, odds: inputs[i].odds, stake: inputs[i].stake, pick: legPick(a, l),
+    league: a.league, away_team: a.away_team, home_team: a.home_team, start_time: a.start_time,
+    market: a.market, side: l.side, line: l.line, profit_pct: a.profit_pct,
+    ...(a.market === "prop" ? { player: a.player, stat: a.stat } : {}),
+  }));
+  $("arbOk").disabled = true;
+  try {
+    const r = await fetch("/api/bets", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "arb", legs, notes: $("arbNotes").value }) });
+    const out = await r.json();
+    if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
+    trackedArbs.add(arbKey(a));
+    $("arbDlg").close();
+    renderArbs(lastArbs);
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.innerHTML = `Tracked ${esc(out.added[0].group)} · <a href="/bets">History</a>`;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 5000);
+  } catch (err) {
+    $("arbErr").textContent = `Couldn't save: ${errText(err)}`;
+  } finally {
+    $("arbOk").disabled = false;
+  }
+}
+async function loadTrackedArbs() {
+  try {
+    const d = await (await fetch("/api/bets")).json();
+    const groups = {};
+    for (const b of d.bets.filter((b) => b.kind === "arb")) (groups[b.group] ||= []).push(b);
+    trackedArbs = new Set(Object.values(groups).map((legs) => [legs[0].league, legs[0].away_team, legs[0].home_team, legs[0].market,
+      legs[0].player || "", legs[0].stat || "", ...legs.map(legKey).sort()].join("|")));
+    if (lastArbs) renderArbs(lastArbs);
+  } catch {}
+}
+let lastArbs = null;
+$("arbForm").addEventListener("submit", confirmArbTrack);
+$("arbCancel").addEventListener("click", () => $("arbDlg").close());
+$("arbLegs").addEventListener("input", arbCalc);
+$("arbList").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-track-arb]");
+  if (b) openArbTrack(shownArbs[+b.dataset.trackArb]);
+});
+loadTrackedArbs();
+
+let arbSeq = 0;
+async function loadArbs(refresh = false) {
+  const seq = ++arbSeq;
+  $("arbScan").disabled = true;
+  if (scanWatch && !refresh) return;  // a background scan is running; its results load when it ends
+  $("arbStatus").innerHTML = `<span class="loading"></span>${refresh ? `Re-pulling ${esc(scopeText(ctl.manual))}…${ctl.manual.stats.length && ctl.manual.leagues.some((l) => PROP_LEAGUES.includes(l)) ? " (props take a few minutes)" : ""}` : "Checking the cached lines…"}`;
+  try {
+    const min = parseFloat($("arbMin").value) || 0;
+    const live = $("live").checked ? 1 : 0;
+    const r = await fetch(`/api/arbs?min=${min}&live=${live}&${profileQS(ctl.manual)}${refresh ? "&refresh=1" : ""}`);
+    const d = await r.json();
+    if (seq !== arbSeq) return;
+    if (!r.ok) throw new Error(d.error || r.statusText);
+    $("arbBank").value = d.bankroll.toFixed(2);
+    renderArbs(d);
+    upd.lines = Object.values(d.scanned_at || {});
+    upd.props = Object.values(d.props_scanned_at || {});
+    renderUpdated();
+    const times = Object.values(d.scanned_at).sort();
+    const at = times.length ? mtWhen(times[0]) : "–";
+    const pt = Object.values(d.props_scanned_at || {}).sort()[0];
+    const nl = Object.keys(d.scanned_at).length;
+    $("arbStatus").textContent = `${d.arbs.length} found · ${d.profile.books.length} book${d.profile.books.length === 1 ? "" : "s"}, ${nl} league${nl === 1 ? "" : "s"}` +
+      (nl ? ` · lines as of ${at}` : "") + (pt ? ` · props as of ${mtWhen(pt)}` : "");
+    render();
+  } catch (e) {
+    if (seq === arbSeq) $("arbStatus").textContent = "Error: " + errText(e);
+  } finally {
+    if (seq === arbSeq) $("arbScan").disabled = !!scanWatch;
+  }
+}
+
+function selectLeague(lg) {
+  state.league = lg;
+  state.data = null;
+  safeSet("league", lg);
+  document.querySelectorAll("#leagues button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.league === lg));
+  render();
+  load();
+}
+
+document.querySelectorAll("#leagues button").forEach((b) => b.addEventListener("click", () => selectLeague(b.dataset.league)));
+$("refresh").addEventListener("click", () => load(true).then(() => loadArbs()));
+$("live").addEventListener("change", () => { safeSet("live", $("live").checked ? "1" : "0"); render(); loadArbs(); });
+$("arbScan").addEventListener("click", scanSelected);
+
+// The scan runs on the Mac in the background and the page waits for it, so
+// locking the phone or leaving the app mid-scan (props take minutes) loses nothing.
+let scanWatch = null;
+async function scanSelected() {
+  $("arbScan").disabled = true;
+  $("arbStatus").innerHTML = `<span class="loading"></span>Re-pulling ${esc(scopeText(ctl.manual))}…${ctl.manual.stats.length && ctl.manual.leagues.some((l) => PROP_LEAGUES.includes(l)) ? " (props take a few minutes)" : ""}`;
+  try {
+    clearTimeout(saveTimer);
+    if (!ctl.loaded && !(await loadSettings())) throw new TypeError("Mac out of reach");
+    await postJSON("/api/settings", { manual: ctl.manual });  // the scan reads the saved controls
+    const r = await fetch("/api/scan", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ quiet: true }) });
+    if (r.status === 409) $("arbStatus").innerHTML = `<span class="loading"></span>A scan is already running; its results show when it finishes…`;
+    else if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+  } catch (e) {
+    $("arbStatus").textContent = "Error: " + errText(e);
+    $("arbScan").disabled = false;
+    return;
+  }
+  clearInterval(scanWatch);
+  scanWatch = setInterval(async () => {
+    try {
+      const s = await (await fetch("/api/status", { cache: "no-store" })).json();
+      if (s.running) return;
+      clearInterval(scanWatch); scanWatch = null;
+      lastRun = s.last_run;
+      await loadArbs();
+      load(); refreshEstimate();
+    } catch {}  // keep waiting: the Mac may be out of reach for a moment
+  }, 3000);
+}
+let arbTimer;
+for (const id of ["arbMin"]) $(id).addEventListener("input", () => { clearTimeout(arbTimer); arbTimer = setTimeout(() => loadArbs(), 400); });
+$("search").addEventListener("input", render);
+$("live").checked = safeGet("live", "0") === "1";
+// ---- "Last update" banner: newest data on the server, how old it is, next run ----
+const upd = { lines: [], props: [], next: null, running: false, lastRun: null };
+function ago(ms) {
+  const m = Math.round(ms / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h} hr ${m % 60} min ago` : `${Math.floor(h / 24)} day${h >= 48 ? "s" : ""} ago`;
+}
+function renderUpdated() {
+  const stamps = [...upd.lines, ...upd.props, state.data?.scraped_at].filter(Boolean).sort();
+  const el = $("updated");
+  if (!stamps.length && !upd.next) { el.innerHTML = ""; return; }
+  const latest = stamps.at(-1);
+  const age = latest ? Date.now() - new Date(latest) : Infinity;
+  const dayFmt = mtWhen;
+  el.className = "updbar" + (upd.running ? " busy" : age > 4 * 3600 * 1000 ? " stale" : "");
+  const props = upd.props.length ? upd.props.slice().sort().at(-1) : null;
+  el.innerHTML = upd.running
+    ? `<span><span class="dot"></span><b>Updating now…</b></span>${latest ? `<span>last update ${dayFmt(latest)}</span>` : ""}`
+    : `<span><span class="dot"></span>Last update <b>${latest ? dayFmt(latest) : "—"}</b>${latest ? ` · ${ago(age)}` : ""}</span>` +
+      (props ? `<span>props ${dayFmt(props)}</span>` : "") +
+      (upd.next ? `<span>next ${dayFmt(upd.next)}</span>` : "");
+}
+setInterval(renderUpdated, 30000);
+
+// ---- Min profit stepper: ± 0.1%, hold to repeat ----
+function stepMin(delta) {
+  const box = $("arbMin");
+  const v = Math.round(((parseFloat(box.value) || 0) + delta) * 10) / 10;
+  box.value = Math.min(20, Math.max(-5, v)).toFixed(1);
+  box.dispatchEvent(new Event("input"));  // reruns the scan after a short pause
+}
+document.querySelectorAll(".stepper .step").forEach((b) => {
+  let hold, repeat;
+  const stop = () => { clearTimeout(hold); clearInterval(repeat); };
+  b.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    const d = parseFloat(b.dataset.step);
+    stepMin(d);
+    hold = setTimeout(() => { repeat = setInterval(() => stepMin(d), 90); }, 400);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach((ev) => b.addEventListener(ev, stop));
+  b.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); stepMin(parseFloat(b.dataset.step)); } });
+});
+$("arbMin").addEventListener("change", () => stepMin(0));  // tidy typed values to one decimal
+
+// ---- Scan controls: which leagues, books, markets and prop stats a scan pulls ----
+// Switched-off items aren't pulled (saving Odds API credits) and aren't paired
+// for arbitrage. Saved on the Mac, so the menu bar's Scan Now uses them too.
+const MARKET_OPTS = [["moneyline", "Moneyline"], ["spread", "Spread"], ["total", "Total"]];
+const STAT_OPTS = [["assists", "Assists"], ["rebounds", "Rebounds"], ["steals", "Steals"], ["turnovers", "Turnovers"]];
+const ALL_PROFILE = () => ({ leagues: LEAGUES.map(([c]) => c), books: [...BOOKS], markets: MARKET_OPTS.map(([k]) => k), stats: STAT_OPTS.map(([k]) => k) });
+// loaded: the saved controls and runs came from the Mac. Until then the page shows
+// defaults, and saving those would overwrite your real settings.
+const ctl = { manual: ALL_PROFILE(), apiBooks: ["DraftKings", "BetMGM", "Caesars", "Fanatics"], runs: [], loaded: false };
+const GROUPS = [
+  ["leagues", "Sports", () => LEAGUES.map(([c, s, n]) => [c, s, n])],
+  ["books", "Books", () => BOOKS.map((b) => [b, b + (ctl.apiBooks.includes(b) ? '<span class="api">API</span>' : ""),
+    ctl.apiBooks.includes(b) ? "From The Odds API (uses credits)" : "Pulled directly from the book (free)"])],
+  ["markets", "Game lines", () => MARKET_OPTS.map(([k, l]) => [k, l])],
+  ["stats", "Player props · basketball", () => STAT_OPTS.map(([k, l]) => [k, l])],
+];
+const profileQS = (p) => ["leagues", "books", "markets", "stats"].map((k) => `${k}=${encodeURIComponent(p[k].join(","))}`).join("&");
+
+function scopeText(p) {
+  const lg = p.leagues.length === LEAGUES.length ? "all sports" : p.leagues.map((c) => LEAGUE_SHORT[c]).join(", ") || "no sports";
+  const bk = p.books.length === BOOKS.length ? "all books" : p.books.length ? `${p.books.length} book${p.books.length === 1 ? "" : "s"}` : "no books";
+  const what = [p.markets.length ? (p.markets.length === 3 ? "lines" : p.markets.join("/")) : "",
+                p.stats.length && p.leagues.some((l) => PROP_LEAGUES.includes(l)) ? (p.stats.length === 4 ? "props" : p.stats.join("/") + " props") : ""]
+    .filter(Boolean).join(" + ") || "nothing";
+  return `${lg} · ${bk} · ${what}`;
+}
+
+// Renders the four chip groups for a profile into el; onChange runs after each toggle.
+function renderChips(el, p, onChange) {
+  el.innerHTML = GROUPS.map(([key, label, opts]) => `<div class="ctl-group" data-key="${key}">
+    <div class="ctl-label"><span>${label}</span><span><button type="button" class="linkbtn" data-all="1">All</button> · <button type="button" class="linkbtn" data-all="0">None</button></span></div>
+    <div class="chips">${opts().map(([v, l, t]) => `<button type="button" class="chip" data-v="${esc(v)}" aria-pressed="${p[key].includes(v)}"${t ? ` title="${esc(t)}"` : ""}>${l}</button>`).join("")}</div>
+  </div>`).join("");
+  el.querySelectorAll(".ctl-group").forEach((g) => {
+    const key = g.dataset.key, order = GROUPS.find(([k]) => k === key)[2]().map(([v]) => v);
+    g.addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip"), all = e.target.closest("[data-all]");
+      if (chip) {
+        const on = chip.getAttribute("aria-pressed") !== "true";
+        chip.setAttribute("aria-pressed", on);
+        const set = new Set(p[key]); on ? set.add(chip.dataset.v) : set.delete(chip.dataset.v);
+        p[key] = order.filter((v) => set.has(v));
+      } else if (all) {
+        p[key] = all.dataset.all === "1" ? [...order] : [];
+        g.querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", p[key].includes(c.dataset.v)));
+      } else return;
+      onChange();
+    });
+  });
+}
+
+async function estimateText(p) {
+  const e = await postJSON("/api/estimate", p);
+  const parts = [];
+  if (!e.api_books.length) parts.push("<b>0</b> Odds API credits (direct books only)");
+  else {
+    parts.push(`≈ <b>${e.total.toLocaleString()}</b> Odds API credit${e.total === 1 ? "" : "s"}`);
+    const why = [e.lines ? `${e.lines} lines` : "", e.props ? `up to ${e.props} props` : ""].filter(Boolean).join(" + ");
+    if (why) parts.push(why);
+  }
+  if (e.remaining != null) parts.push(`${e.remaining.toLocaleString()} left`);
+  let html = parts.join(" · ");
+  const off = e.off_season.filter((l) => p.leagues.includes(l)).map((l) => LEAGUE_SHORT[l]);
+  if (off.length) html += `<br>${esc(off.join(", "))}: out of season, skipped`;
+  const warn = !p.leagues.length ? "No sports selected." : p.books.length < 2 ? "Arbitrage needs at least two books."
+    : !p.markets.length && !(p.stats.length && p.leagues.some((l) => PROP_LEAGUES.includes(l))) ? "No game lines or props selected." : "";
+  if (warn) html += `<br><span class="warnt">${warn}</span>`;
+  return html;
+}
+
+let estSeq = 0;
+async function refreshEstimate() {
+  const seq = ++estSeq;
+  try { const h = await estimateText(ctl.manual); if (seq === estSeq) $("est").innerHTML = `This scan: ${h}`; } catch {}
+}
+
+let saveTimer;
+function manualChanged() {
+  refreshEstimate();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    // Saved controls never loaded (Mac out of reach): fetch them first rather than
+    // overwrite them with the defaults this page started with.
+    if (!ctl.loaded) {
+      const ok = await loadSettings();  // shows your saved controls again
+      $("est").insertAdjacentHTML("beforeend", `<br><span class="warnt">${ok
+        ? "Loaded your saved controls from the Mac; make that change again."
+        : "Not saved: can't reach the Mac. Your saved controls are unchanged."}</span>`);
+      return;
+    }
+    postJSON("/api/settings", { manual: ctl.manual }).catch(() => {});
+    loadArbs();
+  }, 500);
+}
+
+function setCtlCollapsed(c) {
+  $("ctl").classList.toggle("collapsed", c);
+  $("ctlToggle").textContent = c ? "Show" : "Hide";
+  $("ctlToggle").setAttribute("aria-expanded", !c);
+  safeSet("ctlCollapsed", c ? "1" : "0");
+}
+$("ctlToggle").addEventListener("click", () => setCtlCollapsed(!$("ctl").classList.contains("collapsed")));
+setCtlCollapsed(safeGet("ctlCollapsed", "0") === "1");
+
+async function loadSettings() {
+  try {
+    const r = await fetch("/api/settings");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const s = await r.json();
+    ctl.manual = s.manual; ctl.runs = s.runs; ctl.apiBooks = s.options.api_books;
+    ctl.loaded = true;
+  } catch {}
+  renderChips($("ctlGroups"), ctl.manual, manualChanged);
+  await refreshEstimate();
+  return ctl.loaded;
+}
+
+// ---- Schedule editor: each run has a time and its own controls ----
+let draft = [];
+function runSummary(r) { return scopeText(r); }
+function renderRuns() {
+  const box = $("schedRuns");
+  if (!draft.length) { box.innerHTML = `<div class="pane-empty">No scheduled scans. Add a run to scan automatically.</div>`; return; }
+  box.innerHTML = draft.map((r, i) => `<div class="run${r.enabled ? "" : " off"}${r._open ? " open" : ""}" data-i="${i}">
+    <div class="run-top">
+      <label class="switch" title="Run at this time"><input type="checkbox" data-act="enabled"${r.enabled ? " checked" : ""} aria-label="Enable the ${r.time} run"><span></span></label>
+      <input type="time" value="${r.time}" data-act="time" aria-label="Run time, US Mountain">
+      <span class="run-sum">${esc(runSummary(r))}<br><span class="run-est" data-est="${i}"></span></span>
+      <button type="button" class="btn" data-act="edit">${r._open ? "Done" : "Edit"}</button>
+      <button type="button" class="btn" data-act="del" aria-label="Delete the ${r.time} run">✕</button>
+    </div>
+    <div class="run-body"><div class="run-chips"></div>
+      <div class="est"><button type="button" class="linkbtn" data-act="copy">Copy from Scan controls</button></div></div>
+  </div>`).join("");
+  box.querySelectorAll(".run").forEach((el) => {
+    const r = draft[+el.dataset.i];
+    if (r._open) renderChips(el.querySelector(".run-chips"), r, () => {
+      el.querySelector(".run-sum").firstChild.textContent = runSummary(r);
+      runEstimate(+el.dataset.i);
+    });
+    runEstimate(+el.dataset.i);
+  });
+}
+async function runEstimate(i) {
+  const el = document.querySelector(`[data-est="${i}"]`);
+  if (!el) return;
+  try {
+    const e = await postJSON("/api/estimate", draft[i]);
+    el.textContent = e.api_books.length ? `≈ ${e.total.toLocaleString()} Odds API credits` : "0 Odds API credits";
+  } catch {}
+}
+$("schedRuns").addEventListener("click", (e) => {
+  const act = e.target.closest("[data-act]")?.dataset.act, el = e.target.closest(".run");
+  if (!el || !act) return;
+  const r = draft[+el.dataset.i];
+  if (act === "edit") { r._open = !r._open; renderRuns(); }
+  else if (act === "del") { draft.splice(+el.dataset.i, 1); renderRuns(); }
+  else if (act === "copy") { Object.assign(r, structuredClone(ctl.manual)); renderRuns(); }
+});
+$("schedRuns").addEventListener("change", (e) => {
+  const act = e.target.dataset.act, el = e.target.closest(".run");
+  if (!el) return;
+  const r = draft[+el.dataset.i];
+  if (act === "enabled") { r.enabled = e.target.checked; el.classList.toggle("off", !r.enabled); }
+  if (act === "time" && e.target.value) r.time = e.target.value.slice(0, 5);
+});
+$("schedEdit").addEventListener("click", async () => {
+  if (!(await loadSettings()) && !ctl.loaded) {
+    $("schedStatus").textContent = "Couldn't load the schedule: can't reach the Mac. Try again in a moment.";
+    return;
+  }
+  draft = structuredClone(ctl.runs);
+  $("schedNote").textContent = "";
+  renderRuns();
+  $("schedDlg").showModal();
+});
+$("schedAdd").addEventListener("click", () => {
+  draft.push({ time: "12:00", enabled: true, ...structuredClone(ctl.manual), _open: true });
+  renderRuns();
+  $("schedRuns").lastElementChild.scrollIntoView({ block: "nearest" });
+});
+$("schedCancel").addEventListener("click", () => $("schedDlg").close());
+$("schedSave").addEventListener("click", async () => {
+  const runs = draft.map(({ _open, ...r }) => r);
+  let r, d;
+  try {
+    r = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runs }) });
+    d = await r.json().catch(() => ({}));
+  } catch (e) { $("schedNote").textContent = "Couldn't save: " + errText(e); return; }
+  if (!r.ok) { $("schedNote").textContent = d.error || "Couldn't save."; return; }
+  ctl.runs = d.runs;
+  $("schedDlg").close();
+  setTimeout(pollSchedule, 500);  // the scheduler picks up the new times right away
+});
+
+// ---- Scheduled runs: show the next one, and pull new data when one finishes ----
+let lastRun;
+async function pollSchedule() {
+  try {
+    const s = await (await fetch("/api/status")).json();
+    upd.next = s.next_run; upd.running = s.running; upd.lastRun = s.last_run;
+    renderUpdated();
+    const label = s.running_label || "Scheduled scan";
+    $("schedStatus").textContent = s.running ? `${label} running now…`
+      : s.next_run ? `+EV auto-scans ${s.times.join(", ")} MT · next ${mtTime(s.next_run)} MT · arbitrage on demand` : "Auto-scans off · arbitrage on demand";
+    // A scheduled run (or the Mac app's Scan Now) finished: show its results.
+    if (lastRun !== undefined && s.last_run !== lastRun && !s.running) { load(); loadArbs(); refreshEstimate(); }
+    if (lastRun === undefined || !s.running) lastRun = s.last_run;
+  } catch {}
+}
+pollSchedule();
+setInterval(pollSchedule, 60000);
+// The home-screen app wakes from the background without reloading, so check right away.
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pollSchedule(); });
+
+// ---- Phone controls: which view (bottom tabs) and which market ----
+function setView(v) {
+  document.body.dataset.view = v;
+  safeSet("view", v);
+  document.querySelectorAll(".tabbar button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.view === v));
+  window.scrollTo(0, 0);
+}
+function setMarket(m) {
+  document.body.dataset.market = m;
+  safeSet("market", m);
+  document.querySelectorAll("#markets button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.market === m));
+}
+document.querySelectorAll(".tabbar button").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
+document.querySelectorAll("#markets button").forEach((b) => b.addEventListener("click", () => setMarket(b.dataset.market)));
+// A tapped alert opens /?view=arbs, which wins over the remembered tab.
+const urlView = new URLSearchParams(location.search).get("view");
+setView((urlView || safeGet("view", "lines")) === "arbs" ? "arbs" : "lines");
+if (urlView) history.replaceState(null, "", "/");
+setMarket(["moneyline", "spread", "total"].includes(safeGet("market", "")) ? safeGet("market", "") : "moneyline");
+
+// Lets the app open with the last lines when the Mac can't be reached.
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+
+// ---- Push alerts for arbitrage found by the scheduled runs ----
+const pushSupported = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+function b64ToBytes(b64) {
+  const s = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(s, (c) => c.charCodeAt(0));
+}
+const postJSON = (path, body) =>
+  fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) })
+    .then((r) => r.json());
+
+async function currentSub() {
+  const reg = await navigator.serviceWorker.getRegistration();
+  return reg ? reg.pushManager.getSubscription() : null;
+}
+
+// The Mac app's window tags its user agent; Web Push isn't available there, the Mac shows banners instead.
+const inMacApp = navigator.userAgent.includes("SportsbookLinesMac");
+
+async function renderAlerts(msg = "") {
+  const box = $("alerts");
+  if (inMacApp) { box.textContent = "This Mac shows a notification when a scan finds arbitrage at or above the alert threshold."; return; }
+  if (isIOS && !standalone) {
+    box.innerHTML = "Want alerts on this phone? Tap Share → <b>Add to Home Screen</b>, then open Lines from its icon.";
+    return;
+  }
+  if (!pushSupported) { box.textContent = "This browser can't receive push alerts."; return; }
+  if (Notification.permission === "denied") {
+    box.textContent = isIOS
+      ? "Alerts are blocked. Allow them in iPhone Settings → Notifications → Lines."
+      : "Alerts are blocked for this site. Allow notifications in your browser's site settings, then reload.";
+    return;
+  }
+  const sub = await currentSub().catch(() => null);
+  box.innerHTML = sub
+    ? `<span class="on">Alerts on</span> for +EV lines (scheduled runs) and arbitrage (Scan Now) · <button class="linkbtn" id="pushTest">Send test</button> · <button class="linkbtn" id="pushOff">Turn off</button>${msg ? " · " + esc(msg) : ""}`
+    : `<button class="btn primary" id="pushOn">Turn on alerts</button> Get notified when a scheduled run finds +EV lines, or the menu bar's Scan Now finds 1%+ arbitrage.${msg ? " " + esc(msg) : ""}`;
+  $("pushOn")?.addEventListener("click", enablePush);
+  $("pushTest")?.addEventListener("click", async () => {
+    const r = await postJSON("/api/push/test").catch(() => null);
+    renderAlerts(r ? (r.sent ? "Test sent." : "Test didn't send; try turning alerts off and on.") : "Couldn't reach the Mac.");
+  });
+  $("pushOff")?.addEventListener("click", async () => {
+    const s = await currentSub();
+    if (s) { await postJSON("/api/push/unsubscribe", { endpoint: s.endpoint }).catch(() => {}); await s.unsubscribe(); }
+    renderAlerts();
+  });
+}
+
+async function enablePush() {
+  try {
+    // iPhone only shows the permission prompt in response to a tap, so this runs from the button.
+    if ((await Notification.requestPermission()) !== "granted") return renderAlerts();
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+    const { key } = await (await fetch("/api/push/key")).json();
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+    await postJSON("/api/push/subscribe", sub.toJSON());
+    renderAlerts("You're set.");
+  } catch (e) {
+    renderAlerts("Couldn't turn on alerts: " + errText(e));
+  }
+}
+renderAlerts();
+
+selectLeague(LEAGUE_NAME[safeGet("league", "NBA")] ? safeGet("league", "NBA") : "NBA");
+loadSettings().then(() => loadArbs());
+</script>
+</body>
+</html>

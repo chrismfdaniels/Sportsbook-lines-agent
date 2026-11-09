@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Live Bets</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=2">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b3a8f">
+<link rel="stylesheet" href="/theme.css">
+<script src="/report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; }
+  .bar { max-width: 1100px; margin: 0 auto; padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+  h1 { margin: 0 8px 0 0; }
+  a.nav { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .btn { border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 6px 11px; border-radius: 8px; font: inherit; cursor: pointer; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .upd { margin-left: auto; color: var(--muted); font-size: 13px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .err { background: var(--warn-bg); color: var(--warn-text); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }
+  .err:empty { display: none; }
+
+  .tiles { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 10px; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+  .tile span { display: block; font-size: 12px; color: var(--muted); }
+  .tile b { display: block; font-size: 24px; font-variant-numeric: tabular-nums; margin-top: 2px; font-family: var(--display); letter-spacing: .02em; }
+  .tile small { color: var(--muted); font-size: 12px; }
+  .pos { color: var(--pos); } .neg { color: var(--neg); }
+  .counts { display: flex; gap: 12px; }
+  .counts > span { display: inline-flex; align-items: center; gap: 4px; font-size: 22px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+
+  h2.sec { font-family: var(--display); text-transform: uppercase; letter-spacing: .05em; font-size: 16px; margin: 22px 0 10px; flex-wrap: wrap; row-gap: 2px;
+           display: flex; align-items: center; gap: 8px; }
+  h2.sec small { font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); font-size: 13px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+
+  .game { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .ghead { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 14px; background: var(--head); border-bottom: 1px solid var(--line); font-size: 12px; }
+  .league { font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); flex: none; }
+  /* League, then where the game is on; a long network list trims rather than pushing the clock */
+  .gleft { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+  .tv { display: inline-flex; align-items: center; gap: 4px; min-width: 0; color: var(--text); font-weight: 600; }
+  .tv svg { width: 13px; height: 13px; flex: none; color: var(--muted); }
+  .tv span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .clock { font-weight: 700; color: var(--live); font-variant-numeric: tabular-nums; flex: none; white-space: nowrap; }
+  .clock.final { color: var(--muted); }
+  .clock .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 5px; vertical-align: 1px; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .clock .dot { animation: none; } }
+
+  .score { padding: 8px 14px 6px; }
+  .team { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+  .team .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+  .team .pts { font-family: var(--display); font-size: 24px; font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; color: var(--muted); }
+  .team.lead .nm, .team.lead .pts { color: var(--text); font-weight: 700; }
+  .team .mine { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--live); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; }
+
+  /* Football: who has the ball, and the down and distance */
+  .poss { width: 20px; flex: none; display: grid; place-items: center; color: var(--orange); }
+  .poss svg { width: 19px; height: 13px; display: block; }
+  .sit { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; padding: 0 14px 8px 42px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .sit .rz { font-size: 10px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--neg); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; }
+  .bets { border-top: 1px solid var(--line); }
+  .bet { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 14px; }
+  .bet + .bet { border-top: 1px dashed var(--line); }
+  .trend { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; }
+  .trend svg { width: 18px; height: 18px; }
+  .trend.up { background: color-mix(in srgb, var(--pos) 16%, transparent); color: var(--pos); }
+  .trend.down { background: color-mix(in srgb, var(--neg) 16%, transparent); color: var(--neg); }
+  .trend.flat, .trend.none { background: color-mix(in srgb, var(--muted) 16%, transparent); color: var(--muted); }
+  .pick { font-weight: 700; }
+  .pick .tag { font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--warn-text); background: var(--warn-bg); padding: 1px 5px; border-radius: 4px; margin-left: 4px; vertical-align: 1px; }
+  .meta { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .meta b { color: var(--text); font-weight: 600; }
+  .how { text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .how .t { font-weight: 700; }
+  .how .t.up { color: var(--pos); } .how .t.down { color: var(--neg); } .how .t.flat { color: var(--muted); }
+  .how .sub { color: var(--muted); font-size: 12px; }
+  .result { font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: .04em; }
+  .result.won { background: var(--best-bg); color: var(--best-text); }
+  .result.lost { color: var(--neg); border: 1px solid currentColor; }
+  .result.push { color: var(--muted); border: 1px solid currentColor; }
+
+  .empty { background: var(--card); border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); text-align: center; padding: 36px 16px; }
+  .empty b { display: block; color: var(--text); font-family: var(--display); text-transform: uppercase; letter-spacing: .05em; font-size: 18px; margin-bottom: 4px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 18px; }
+  .misc { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+  .misc .bet .pick { font-weight: 600; }
+
+  /* Settling a finished bet, same choices as History */
+  .actions { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .btn.win { color: var(--pos); font-weight: 600; }
+  .btn.loss { color: var(--neg); font-weight: 600; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  .btn.suggest { border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor; }
+  .toast { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 5;
+           display: flex; gap: 12px; align-items: center; background: var(--text); color: var(--bg); padding: 10px 14px; border-radius: 10px;
+           box-shadow: 0 6px 20px rgba(0, 0, 0, .25); font-size: 14px; max-width: calc(100vw - 32px); }
+  .toast[hidden] { display: none; }
+  .toast button { background: transparent; border: 0; color: inherit; text-decoration: underline; font: inherit; font-weight: 800; cursor: pointer; padding: 0; }
+  dialog.edit { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); padding: 18px; width: min(420px, calc(100vw - 32px)); }
+  dialog.edit::backdrop { background: rgba(0, 0, 0, .45); }
+  dialog.edit h2 { font-size: 16px; margin: 0 0 4px; }
+  dialog.edit .sub { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  dialog.edit .fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  dialog.edit label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  dialog.edit label.wide { grid-column: 1 / -1; }
+  dialog.edit input, dialog.edit select { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); font: inherit; font-size: 16px; }
+  dialog.edit .err { color: var(--neg); font-size: 13px; min-height: 18px; margin-top: 6px; background: none; padding: 0; }
+  dialog.edit .foot { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+
+  @media (max-width: 700px) {
+    .bar { padding: 10px 12px; }
+    main { padding: 12px; }
+    .tiles { grid-template-columns: 1fr 1fr; }
+    .tiles .tile:first-child { grid-column: 1 / -1; }
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    .upd { margin-left: 0; }
+    .how { white-space: normal; max-width: 150px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="nav" href="/">‹ Lines</a>
+    <a class="nav" href="/ev">+EV Finder</a>
+    <a class="nav" href="/bets">History</a>
+    <a class="nav desk-only" href="/stats">Stats</a>
+    <h1>Live</h1>
+    <button class="btn" id="refresh">Refresh</button>
+    <span class="upd" id="upd" role="status" aria-live="polite"></span>
+  </div>
+</header>
+<main>
+  <div class="err" id="err" role="alert"></div>
+  <div id="root"></div>
+  <p class="note">Each arrow shows how the bet stands if the game ended right now. Over/unders are the exception: their arrow
+    follows the pace, the final total the game is on track for, until the line is passed. Projected money follows the arrows.
+    Scores come from ESPN and refresh every 30 seconds while this page is open.</p>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
+<dialog class="edit" id="editDlg" aria-labelledby="editTitle">
+  <form method="dialog" id="editForm">
+    <h2 id="editTitle">Cash out / edit</h2>
+    <div class="sub" id="editSub"></div>
+    <div class="fields">
+      <label>Status<select id="eStatus">
+        <option value="open">Open</option><option value="won">Won</option><option value="lost">Lost</option>
+        <option value="push">Push / void</option><option value="cashout">Cashed out</option>
+      </select></label>
+      <label id="eCashWrap">Cash-out amount $<input id="eCash" type="number" inputmode="decimal" step="0.01" min="0"></label>
+      <label>Odds<input id="eOdds" inputmode="numeric"></label>
+      <label>Stake $<input id="eStake" type="number" inputmode="decimal" step="0.01" min="0.01"></label>
+      <label class="wide">Notes<input id="eNotes" maxlength="300"></label>
+    </div>
+    <div class="err" id="eErr" role="alert"></div>
+    <div class="foot"><button type="button" class="btn" id="eCancel">Cancel</button><button type="submit" class="btn primary" id="eSave">Save</button></div>
+  </form>
+</dialog>
+<script>
+// Every time on the page is US Mountain, whatever zone the device is in.
+const TZ = "America/Denver";
+const REFRESH_MS = 30000;
+// Safari says "Load failed" (Chrome "Failed to fetch") when the Mac can't be reached at all.
+const errText = (e) => e instanceof TypeError ? "Can't reach the Mac. It may be asleep or off, or the phone may be offline." : e.message;
+const $ = (id) => document.getElementById(id);
+const LEAGUE_SHORT = { NBA: "NBA", NFL: "NFL", NHL: "NHL", MLB: "MLB", NCAAF: "College FB", NCAAB: "Men's CBB", WNCAAB: "Women's CBB", NCAABASE: "College BSB" };
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+const odds = (o) => (o > 0 ? "+" : "") + o;
+const cents = (x) => Math.round(x * 100) / 100 || 0;
+const money = (x) => (cents(x) < 0 ? "−$" : "$") + Math.abs(cents(x)).toFixed(2);
+const signed = (x) => (cents(x) > 0 ? "+" : cents(x) < 0 ? "−" : "") + "$" + Math.abs(cents(x)).toFixed(2);
+const cls = (x) => (x > 0 ? "pos" : x < 0 ? "neg" : "");
+const STATUS_NAME = { open: "Open", won: "Won", lost: "Lost", push: "Push", cashout: "Cashed out" };
+function decimalOdds(o) { return o > 0 ? 1 + o / 100 : 1 + 100 / Math.abs(o); }
+function parseOdds(v) {
+  const s = String(v).trim().toUpperCase().replace("−", "-");
+  if (s === "EVEN" || s === "EV") return 100;
+  const n = Number(s.replace("+", ""));
+  return Number.isInteger(n) && Math.abs(n) >= 100 ? n : null;
+}
+async function api(path, body) {
+  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const out = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(out.error || `The Mac answered ${r.status}`);
+  return out;
+}
+const mtTime = (iso) => new Date(iso).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" }) + " MT";
+function mtWhen(iso) {
+  const d = new Date(iso), day = (x) => x.toLocaleDateString("en-US", { timeZone: TZ });
+  return (day(d) === day(new Date()) ? "" : d.toLocaleDateString("en-US", { timeZone: TZ, weekday: "short" }) + " ") + mtTime(iso);
+}
+
+const ARROW = {
+  up: { label: "Trending to win", svg: '<path d="M9 15V3M3.5 8.5 9 3l5.5 5.5"/>' },
+  down: { label: "Trending to lose", svg: '<path d="M9 3v12M3.5 9.5 9 15l5.5-5.5"/>' },
+  flat: { label: "Even", svg: '<path d="M3 9h12"/>' },
+  none: { label: "No grade", svg: '<circle cx="9" cy="9" r="1.6" fill="currentColor" stroke="none"/>' },
+};
+const BALL = `<svg viewBox="0 0 16 11" role="img" aria-label="Has the ball"><title>Has the ball</title>
+  <ellipse cx="8" cy="5.5" rx="7.6" ry="5" fill="currentColor"/>
+  <path d="M5 5.5h6M6.2 4.2v2.6M8 4.2v2.6M9.8 4.2v2.6" stroke="var(--card)" stroke-width="1.1" stroke-linecap="round"/></svg>`;
+
+const TV = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+  <rect x="1.5" y="3.5" width="13" height="9" rx="1.5"/><path d="M5.5 14.5h5M6 1.5l2 2 2-2"/></svg>`;
+
+function trendIcon(t) {
+  const a = ARROW[t || "none"];
+  return `<div class="trend ${t || "none"}" role="img" aria-label="${a.label}" title="${a.label}">
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${a.svg}</svg></div>`;
+}
+
+function betRow(b, final) {
+  const proj = b.projected != null ? `<span class="${cls(b.projected)}">${signed(b.projected)}</span>` : "";
+  // A total whose arrow follows the pace says where it stands right now underneath
+  const detail = b.now_text ? `Now: ${esc(b.now_text)} · pace ${b.pace}` :
+                 b.pace != null ? `Pace ${b.pace} · line ${b.line}` : "";
+  const sub = [detail, proj && `Projected ${proj}`].filter(Boolean).join("<br>");
+  const right = final && b.result
+    ? `<span class="result ${b.result}">${b.result === "won" ? "Won" : b.result === "lost" ? "Lost" : "Push"}</span>
+       <div class="sub" style="margin-top:4px">${proj}</div>`
+    : `<div class="t ${b.trend || ""}">${esc(b.text)}</div><div class="sub">${sub}</div>`;
+  return `<div class="bet">
+    ${trendIcon(b.trend)}
+    <div style="min-width:0">
+      <div class="pick">${esc(b.pick)}${b.kind === "arb" ? `<span class="tag" title="One leg of ${esc(b.group)}">Arb</span>` : ""}</div>
+      <div class="meta">${esc(b.book)} · <b>${odds(b.odds)}</b> · <b>${money(b.stake)}</b> to win ${money(b.to_win)}</div>
+    </div>
+    <div class="how">${right}</div>
+    ${final ? settleButtons(b) : ""}
+  </div>`;
+}
+
+// The button matching the final score is outlined, as a hint; any choice is allowed.
+function settleButtons(b) {
+  const btn = (status, label, extra) =>
+    `<button class="btn ${extra}${b.result === status ? " suggest" : ""}" data-settle="${status}" data-id="${esc(b.id)}"
+      ${b.result === status ? 'title="Matches the final score"' : ""}>${label}</button>`;
+  return `<div class="actions">${btn("won", "Won", "win")}${btn("lost", "Lost", "loss")}${btn("push", "Push", "")}
+    <button class="btn" data-edit="${esc(b.id)}">Cash out / edit</button></div>`;
+}
+
+function gameCard(g) {
+  const final = g.state === "post";
+  const mine = new Set(g.bets.map((b) => b.team).filter(Boolean));
+  const lead = g.away.score === g.home.score ? null : g.away.score > g.home.score ? "away" : "home";
+  // Football cards keep a slot before each name for the ball, so the names line up
+  const football = "possession" in g;
+  const team = (side) => {
+    const t = g[side];
+    return `<div class="team ${lead === side ? "lead" : ""}">
+      ${football ? `<span class="poss">${g.possession === side ? BALL : ""}</span>` : ""}
+      <span class="nm">${esc(t.name)}</span>${mine.has(t.name) ? '<span class="mine">My pick</span>' : ""}
+      <span class="pts">${t.score}</span></div>`;
+  };
+  const clock = final ? `<span class="clock final">${esc(g.detail)}</span>`
+                      : `<span class="clock"><span class="dot"></span>${esc(g.detail)}</span>`;
+  return `<article class="game">
+    <div class="ghead"><span class="gleft"><span class="league">${esc(LEAGUE_SHORT[g.league] || g.league)}</span>${(g.tv || []).length
+      ? `<span class="tv" title="Where it's on: ${esc(g.tv.join(", "))}">${TV}<span>${esc(g.tv.join(" · "))}</span></span>` : ""}</span>${clock}</div>
+    <div class="score">${team("away")}${team("home")}</div>
+    ${football && g.possession ? `<div class="sit"><span>${esc(g[g.possession].abbr || g[g.possession].name)} ball${g.down ? " · " + esc(g.down) : ""}</span>${g.red_zone ? '<span class="rz">Red zone</span>' : ""}</div>` : ""}
+    <div class="bets">${g.bets.map((b) => betRow(b, final)).join("")}</div>
+  </article>`;
+}
+
+function render(d) {
+  const s = d.summary;
+  let html = "";
+  if (d.live.length) {
+    html += `<div class="tiles">
+      <div class="tile"><span>Projected, if every bet finishes as it's trending</span><b class="${cls(s.projected)}">${signed(s.projected)}</b>
+        <small>on ${money(s.stake)} at stake</small></div>
+      <div class="tile"><span>Live bets</span><b>${s.bets}</b><small>in ${s.games} game${s.games === 1 ? "" : "s"}</small></div>
+      <div class="tile"><span>Trending</span>
+        <div class="counts" style="margin-top:4px">
+          <span title="Trending to win" class="pos">▲ ${s.up}</span>
+          <span title="Trending to lose" class="neg">▼ ${s.down}</span>
+          ${s.flat ? `<span title="Even" style="color:var(--muted)">▬ ${s.flat}</span>` : ""}
+        </div></div>
+    </div>
+    <h2 class="sec">In progress <small>${s.games} game${s.games === 1 ? "" : "s"}</small></h2>
+    <div class="grid">${d.live.map(gameCard).join("")}</div>`;
+  } else {
+    const n = d.next;
+    html += `<div class="empty"><b>No live bets</b>
+      ${n ? `Next up: ${esc(n.pick)}${n.count > 1 ? ` and ${n.count - 1} more` : ""} at ${mtWhen(n.start)}.
+             ${n.later > n.count ? `${n.later} open bets still to start.` : ""}`
+          : "None of your open bets are on games that have started."}</div>`;
+  }
+  // Bets settled on this page stay hidden even if a slow or cached response still lists them
+  const listed = new Set(d.final.flatMap((g) => g.bets.map((b) => b.id)));
+  for (const id of [...hidden]) if (!listed.has(id)) hidden.delete(id);
+  const finals = d.final.map((g) => ({ ...g, bets: g.bets.filter((b) => !hidden.has(b.id)) })).filter((g) => g.bets.length);
+  if (finals.length) {
+    const tot = finals.reduce((a, g) => a + g.bets.reduce((x, b) => x + (b.projected || 0), 0), 0);
+    const n = finals.reduce((a, g) => a + g.bets.length, 0);
+    html += `<h2 class="sec">Final, not settled yet <small>${n} bet${n === 1 ? "" : "s"} · ${signed(tot)} if graded as shown</small></h2>
+      <div class="grid">${finals.map(gameCard).join("")}</div>`;
+  }
+  if (d.unmatched.length) {
+    html += `<h2 class="sec">No score found <small>Started, but ESPN doesn't list the game</small></h2>
+      <div class="misc">${d.unmatched.map((b) => betRow(b, false)).join("")}</div>`;
+  }
+  st.data = d;
+  st.bets = new Map([...d.live, ...d.final].flatMap((g) => g.bets.map((b) => [b.id, b])));
+  $("root").innerHTML = html;
+  const stale = Date.now() - new Date(d.at).getTime() > 2 * REFRESH_MS;
+  $("upd").textContent = (stale ? "Saved copy from " : "Updated ") + mtTime(d.at) +
+    (d.errors.length ? ` · ${d.errors.map((l) => LEAGUE_SHORT[l] || l).join(", ")} scores unavailable` : "");
+}
+
+const st = { data: null, bets: new Map(), editing: null };
+const hidden = new Set();
+let busy = false, again = false;
+async function load() {
+  if (busy) { again = true; return; }
+  busy = true;
+  $("refresh").disabled = true;
+  try {
+    const r = await fetch("/api/live");
+    if (!r.ok) throw new Error(`The Mac answered ${r.status}`);
+    render(await r.json());
+    $("err").textContent = "";
+  } catch (e) {
+    $("err").textContent = "Couldn't load live scores. " + errText(e);
+  } finally {
+    busy = false;
+    $("refresh").disabled = false;
+    if (again) { again = false; load(); }
+  }
+}
+
+// Settling, as on History
+let toastT, undoId = null;
+function toast(msg, id) {
+  $("toastMsg").textContent = msg;
+  undoId = id;
+  $("toastUndo").hidden = !id;
+  $("toast").hidden = false;
+  clearTimeout(toastT);
+  toastT = setTimeout(() => { $("toast").hidden = true; undoId = null; }, 8000);
+}
+function outcome(b, status, cashout) {
+  const p = status === "won" ? b.stake * (decimalOdds(b.odds) - 1) : status === "lost" ? -b.stake
+          : status === "cashout" ? (cashout || 0) - b.stake : 0;
+  return `${b.pick}: ${STATUS_NAME[status]} ${signed(p)}`;
+}
+async function settle(id, status, btn) {
+  const b = st.bets.get(id);
+  if (!b) return;
+  btn?.closest(".actions")?.querySelectorAll("button").forEach((x) => { x.disabled = true; });
+  try {
+    await api("/api/bets/update", { id, status });
+    hidden.add(id);
+    toast(outcome(b, status), id);
+    load();
+  } catch (e) {
+    btn?.closest(".actions")?.querySelectorAll("button").forEach((x) => { x.disabled = false; });
+    alert(`Couldn't update: ${errText(e)}`);
+  }
+}
+$("toastUndo").addEventListener("click", async () => {
+  const id = undoId;
+  if (!id) return;
+  try {
+    await api("/api/bets/update", { id, status: "open" });
+    hidden.delete(id);
+    toast("Reopened. It's back in the list.", null);
+    load();
+  } catch (e) { alert(`Couldn't undo: ${errText(e)}`); }
+});
+
+function openEdit(id) {
+  const b = st.bets.get(id);
+  if (!b) return;
+  st.editing = b;
+  $("editSub").textContent = `${b.pick} · ${b.book}${b.group ? " · " + b.group : ""}`;
+  $("eStatus").value = "cashout";
+  $("eCash").value = "";
+  $("eOdds").value = odds(b.odds); $("eStake").value = b.stake; $("eNotes").value = b.notes || "";
+  $("eErr").textContent = "";
+  syncCash();
+  $("editDlg").showModal();
+}
+function syncCash() { $("eCashWrap").style.visibility = $("eStatus").value === "cashout" ? "visible" : "hidden"; }
+$("eStatus").addEventListener("change", syncCash);
+$("eCancel").addEventListener("click", () => $("editDlg").close());
+$("editForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const o = parseOdds($("eOdds").value), s = parseFloat($("eStake").value), status = $("eStatus").value;
+  if (!o) { $("eErr").textContent = "Enter American odds, like -110 or +150."; return; }
+  if (!(s > 0)) { $("eErr").textContent = "Enter the stake."; return; }
+  const body = { id: st.editing.id, odds: o, stake: s, notes: $("eNotes").value, status };
+  if (status === "cashout") {
+    const c = parseFloat($("eCash").value);
+    if (!(c >= 0)) { $("eErr").textContent = "Enter the cash-out amount the book paid."; return; }
+    body.cashout = c;
+  }
+  try {
+    await api("/api/bets/update", body);
+    $("editDlg").close();
+    if (status !== "open") {
+      hidden.add(body.id);
+      toast(outcome({ ...st.editing, odds: o, stake: s }, status, body.cashout), body.id);
+    }
+    load();
+  } catch (err) { $("eErr").textContent = `Couldn't save: ${errText(err)}`; }
+});
+document.addEventListener("click", (e) => {
+  const s = e.target.closest("[data-settle]"), ed = e.target.closest("[data-edit]");
+  if (s) settle(s.dataset.id, s.dataset.settle, s);
+  if (ed) openEdit(ed.dataset.edit);
+});
+
+$("refresh").addEventListener("click", load);
+setInterval(() => { if (document.visibilityState === "visible") load(); }, REFRESH_MS);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") load(); });
+load();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+</script>
+</body>
+</html>

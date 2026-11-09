@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Keeps the lines server (and its daily schedule) running: starts at login,
+     restarts if it exits. Install/remove instructions are in the README. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sportsbook-lines-agent</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/Chris/Desktop/Claude Projects/sportsbook-lines-agent/.venv/bin/python</string>
+    <string>-m</string>
+    <string>lines_agent.web</string>
+    <string>--port</string>
+    <string>8765</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/Chris/Desktop/Claude Projects/sportsbook-lines-agent</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/Chris/Library/Logs/sportsbook-lines-agent.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/Chris/Library/Logs/sportsbook-lines-agent.log</string>
+</dict>
+</plist>

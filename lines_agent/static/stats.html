@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stats</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=2">
+<meta name="theme-color" content="#0b3a8f">
+<link rel="stylesheet" href="/theme.css">
+<script src="/report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; }
+  .bar { max-width: 1200px; margin: 0 auto; padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+  h1 { margin: 0 8px 0 0; }
+  a.nav { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .btn { border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 6px 11px; border-radius: 8px; font: inherit; cursor: pointer; }
+  .upd { margin-left: auto; color: var(--muted); font-size: 13px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+  .err { background: var(--warn-bg); color: var(--warn-text); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }
+  .err:empty { display: none; }
+  h2.sec { font-family: var(--display); text-transform: uppercase; letter-spacing: .05em; font-size: 16px; margin: 24px 0 10px; }
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+  .tile span { display: block; font-size: 12px; color: var(--muted); }
+  .tile b { display: block; font-size: 24px; margin-top: 2px; font-family: var(--display); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+  .tile small { color: var(--muted); font-size: 12px; }
+  .ok { color: var(--pos); } .bad { color: var(--neg); }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+  .panel h3 { font-size: 13px; margin: 0 0 2px; }
+  .panel .sub { color: var(--muted); font-size: 12px; margin: 0 0 8px; }
+  .panel svg { display: block; width: 100%; overflow: visible; }
+  .panel svg text { font-size: 12px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .panel svg text.lbl { fill: var(--text); }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .scroll { overflow-x: auto; }
+  .problems { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text); white-space: pre-wrap; word-break: break-word; margin: 0; }
+  .problems .none { font-family: inherit; color: var(--muted); }
+  .note { color: var(--muted); font-size: 12px; margin-top: 20px; }
+  @media (max-width: 860px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid { grid-template-columns: minmax(0, 1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="nav" href="/">‹ Lines</a>
+    <a class="nav" href="/ev">+EV Finder</a>
+    <a class="nav" href="/bets">History</a>
+    <a class="nav" href="/live">Live</a>
+    <h1>Stats</h1>
+    <button class="btn" id="refresh">Refresh</button>
+    <span class="upd" id="upd" role="status" aria-live="polite"></span>
+  </div>
+</header>
+<main>
+  <div class="err" id="err" role="alert"></div>
+  <div id="root"></div>
+  <p class="note">From the files on the Mac and its logs (~/Library/Logs/SportsbookLines). Traffic covers the last 24 hours;
+    scrapes, runs and alerts the last 7 days; credits the last 14. Phone storage is calculated from what the app keeps
+    offline. Refreshes every minute while open.</p>
+</main>
+<script>
+const TZ = "America/Denver";
+const errText = (e) => e instanceof TypeError ? "Can't reach the Mac's server." : e.message;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const num = (n) => n == null ? "–" : Math.round(n).toLocaleString("en-US");
+function bytes(n) {
+  if (n == null) return "–";
+  const u = [["GB", 1e9], ["MB", 1e6], ["KB", 1e3]];
+  for (const [s, v] of u) if (n >= v) return (n / v >= 100 ? Math.round(n / v) : (n / v).toFixed(1)) + " " + s;
+  return Math.round(n) + " B";
+}
+const money = (x) => (x < 0 ? "−$" : "$") + Math.abs(x).toFixed(2);
+const signed = (x) => (x > 0 ? "+" : x < 0 ? "−" : "") + "$" + Math.abs(x).toFixed(2);
+const mt = (iso) => iso ? new Date(iso).toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + " MT" : "–";
+function dur(s) {
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : `${m} min`;
+}
+// Width of a chart panel's drawing area: two columns on wide windows, one below 860px
+let W = 520;
+function panelWidth() {
+  const root = $("root").clientWidth || 1000;
+  return Math.max(280, Math.round((root >= 860 ? (root - 12) / 2 : root) - 30));
+}
+const tile = (label, value, sub, cls = "") => `<div class="tile"><span>${label}</span><b class="${cls}">${value}</b><small>${sub}</small></div>`;
+
+// Horizontal bars: items [{label, value, text, color}]; one row per item.
+function hbars(items, { labelW = 130, row = 26 } = {}) {
+  const valW = 64, max = Math.max(...items.map((i) => Math.abs(i.value)), 1);
+  const H = items.length * row;
+  const plot = W - labelW - valW;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(items.map((i) => `${i.label} ${i.text}`).join(", "))}">${items.map((it, k) => {
+    const y = k * row, w = Math.max(2, Math.abs(it.value) / max * plot);
+    return `<text class="lbl" x="0" y="${y + row / 2 + 4}">${esc(it.label)}</text>
+      <rect x="${labelW}" y="${y + 5}" width="${w}" height="${row - 10}" rx="4" style="fill:${it.color || "var(--accent)"}"/>
+      <text x="${labelW + w + 6}" y="${y + row / 2 + 4}">${esc(it.text)}</text>`;
+  }).join("")}</svg>`;
+}
+// Paired bars (before / now) per item.
+function pairs(items, fmt) {
+  const labelW = 80, row = 40, max = Math.max(...items.flatMap((i) => [i.a, i.b]), 1), plot = W - labelW - 70;
+  return `<svg viewBox="0 0 ${W} ${items.length * row}" role="img" aria-label="${esc(items.map((i) => `${i.label}: ${fmt(i.a)} before, ${fmt(i.b)} now`).join("; "))}">${items.map((it, k) => {
+    const y = k * row, wa = Math.max(2, it.a / max * plot), wb = Math.max(2, it.b / max * plot);
+    return `<text class="lbl" x="0" y="${y + 23}">${esc(it.label)}</text>
+      <rect x="${labelW}" y="${y + 4}" width="${wa}" height="14" rx="4" style="fill:var(--muted);opacity:.45"/>
+      <text x="${labelW + wa + 6}" y="${y + 15}">${fmt(it.a)}</text>
+      <rect x="${labelW}" y="${y + 20}" width="${wb}" height="14" rx="4" style="fill:var(--accent)"/>
+      <text x="${labelW + wb + 6}" y="${y + 31}">${fmt(it.b)}</text>`;
+  }).join("")}</svg>`;
+}
+// Columns over days.
+function columns(items) {
+  const H = 170, padB = 22, padT = 16, max = Math.max(...items.map((i) => i.value), 1), slot = W / items.length;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(items.map((i) => `${i.label} ${i.value}`).join(", "))}">
+    <line x1="0" x2="${W}" y1="${H - padB}" y2="${H - padB}" style="stroke:var(--line)"/>
+    ${items.map((it, k) => {
+      const h = it.value ? Math.max(2, it.value / max * (H - padB - padT)) : 0, x = k * slot + slot * 0.2, w = slot * 0.6;
+      return `${h ? `<rect x="${x}" y="${H - padB - h}" width="${w}" height="${h}" rx="3" style="fill:var(--accent)"><title>${esc(it.label)}: ${it.value} credits</title></rect>` : ""}
+        ${it.value ? `<text x="${x + w / 2}" y="${H - padB - h - 4}" text-anchor="middle">${it.value}</text>` : ""}
+        ${slot >= 34 || k % 2 === items.length % 2 ? `<text x="${x + w / 2}" y="${H - 6}" text-anchor="middle">${esc(it.label)}</text>` : ""}`;
+    }).join("")}</svg>`;
+}
+// Above/below zero, e.g. profit by book.
+function diverging(items) {
+  const row = 26, labelW = 110, max = Math.max(...items.map((i) => Math.abs(i.value)), 1);
+  const mid = labelW + (W - labelW) / 2, half = (W - labelW) / 2 - 60;
+  return `<svg viewBox="0 0 ${W} ${items.length * row}" role="img" aria-label="${esc(items.map((i) => `${i.label} ${signed(i.value)}`).join(", "))}">
+    <line x1="${mid}" x2="${mid}" y1="0" y2="${items.length * row}" style="stroke:var(--line)"/>
+    ${items.map((it, k) => {
+      const y = k * row, w = Math.max(2, Math.abs(it.value) / max * half), neg = it.value < 0;
+      return `<text class="lbl" x="0" y="${y + row / 2 + 4}">${esc(it.label)}</text>
+        <rect x="${neg ? mid - w : mid}" y="${y + 5}" width="${w}" height="${row - 10}" rx="4" style="fill:${neg ? "var(--neg)" : "var(--pos)"}"/>
+        <text x="${neg ? mid - w - 6 : mid + w + 6}" y="${y + row / 2 + 4}" text-anchor="${neg ? "end" : "start"}">${signed(it.value)}</text>`;
+    }).join("")}</svg>`;
+}
+
+let last = null;
+function render(d) {
+  last = d;
+  W = panelWidth();
+  const t = d.traffic, h = d.health, b = d.bets, s = d.server, c = d.credits;
+  const scrOk = h.scrapes.reduce((a, x) => a + x.ok, 0), scrBad = h.scrapes.reduce((a, x) => a + x.failed, 0);
+  const perDay = Math.round(h.credits_week / 7);
+  const lines = t.per_page.find((p) => p.page === "Lines") || { now: 0, uncompressed: 0 };
+  let html = `<h2 class="sec">At a glance</h2><div class="tiles">
+    ${tile("On disk", bytes(d.disk.total), `${bytes(d.disk.free)} free on the Mac`)}
+    ${tile("Server memory", bytes(s.memory), `up ${dur(s.uptime_seconds)} · ${s.threads} threads`)}
+    ${tile("Odds API credits left", num(c.remaining), `~${num(perDay)} a day this week${c.from_log ? " · from the log" : ""}`)}
+    ${tile("Phone data, Lines page", bytes(lines.now), `was ${bytes(lines.uncompressed)} uncompressed`)}
+    ${tile("Requests, 24 h", num(t.requests), `${t.server_errors ? `<span class="bad">${t.server_errors} server errors</span>` : '<span class="ok">0 server errors</span>'} · ${t.slow} slow`)}
+    ${tile("Book scrapes, 7 days", num(scrOk), scrBad ? `<span class="bad">${scrBad} failed</span>` : '<span class="ok">0 failed</span>')}
+    ${tile("Scheduled runs, 7 days", num(h.runs), h.run_failures ? `<span class="bad">${h.run_failures} failed</span>` : '<span class="ok">none failed</span>' + ` · next ${mt(d.schedule.next_run)}`)}
+    ${tile("Push alerts, 7 days", num(h.pushes), h.push_failed ? `<span class="bad">${h.push_failed} failed</span>` : `<span class="ok">${h.push_sent} delivered, 0 failed</span>`)}
+  </div>`;
+
+  html += `<h2 class="sec">Mac</h2><div class="grid">
+    <div class="panel"><h3>Disk use by part</h3><p class="sub">Most of it is tools: the browser that reads theScore Bet, and Python's libraries</p>
+      ${hbars(d.disk.parts.filter((p) => p.bytes).sort((x, y) => y.bytes - x.bytes).map((p) => ({ label: p.name, value: p.bytes, text: bytes(p.bytes) })))}</div>
+    <div class="panel"><h3>Odds API credits used per day</h3><p class="sub">${num(h.credits_week)} this week · ${num(c.remaining)} left</p>
+      ${columns(h.credits_by_day.map((x) => ({ label: x.day.slice(5).replace("-", "/"), value: x.used })))}</div>
+  </div>`;
+
+  html += `<h2 class="sec">Phone</h2><div class="grid">
+    <div class="panel"><h3>Data per page open</h3><p class="sub">Live adds ~${bytes(t.live_refresh)} every 30 s while open (~${bytes(t.live_hour)} an hour)</p>
+      <div class="legend"><span><i style="background:var(--muted);opacity:.45"></i>Uncompressed</span><span><i style="background:var(--accent)"></i>Sent now</span></div>
+      ${pairs(t.per_page.map((p) => ({ label: p.page, a: p.uncompressed, b: p.now })), bytes)}</div>
+    <div class="panel"><h3>Kept on the phone for offline use</h3><p class="sub">Up to ${bytes(d.phone.most)}; lines and props only for sports you've opened</p>
+      ${hbars([{ label: "Lines, every sport", value: d.phone.lines_all, text: bytes(d.phone.lines_all) },
+               { label: "Player props", value: d.phone.props_all, text: bytes(d.phone.props_all) },
+               { label: "App pages + icons", value: d.phone.app, text: bytes(d.phone.app) },
+               { label: "Latest bets, live…", value: d.phone.feeds, text: bytes(d.phone.feeds) }])}</div>
+  </div>`;
+
+  html += `<h2 class="sec">Results</h2><div class="tiles">
+    ${tile("Bankroll", money(b.bankroll), `from ${money(b.starting)}`)}
+    ${tile("Settled profit / loss", signed(b.pnl), `ROI ${b.roi_pct ?? "–"}% on ${money(b.staked)}`, b.pnl >= 0 ? "ok" : "bad")}
+    ${tile("Record (W-L-P)", `${b.won}-${b.lost}${b.push ? "-" + b.push : ""}`, `${b.open} open · ${money(b.open_stake)} at stake`)}
+    ${tile("+EV: actual vs expected", signed(b.ev_pnl), `the edge predicted ${signed(b.ev_expected)}`)}
+  </div>
+  <div class="grid" style="margin-top:12px">
+    <div class="panel"><h3>Settled profit by sportsbook</h3><p class="sub">Bets per book in the table under Traffic</p>${diverging(b.by_book.map((x) => ({ label: x.book, value: x.pnl })))}</div>
+    <div class="panel"><h3>Scrapes by source, last 7 days</h3><p class="sub">Each league pull from each book</p>
+      ${hbars(h.scrapes.map((x) => ({ label: x.book, value: x.ok, text: `${num(x.ok)}${x.failed ? ` · ${x.failed} failed` : ""}`, color: x.failed ? "var(--neg)" : undefined })))}</div>
+  </div>`;
+
+  html += `<h2 class="sec">Traffic and data</h2><div class="grid">
+    <div class="panel scroll"><h3>By device, last 24 h</h3><p class="sub">Median answer ${num(t.median_ms)} ms · 95% under ${num(t.p95_ms)} ms (server time; Re-pulls excluded)</p>
+      <table><thead><tr><th>Device</th><th>Requests</th><th>Sent</th><th>Uncompressed</th></tr></thead><tbody>
+      ${t.devices.map((x) => `<tr><td>${esc(x.device === "Other" ? "Other (tools, tests)" : x.device)}</td><td>${num(x.requests)}</td><td>${bytes(x.sent)}</td><td>${bytes(x.raw)}</td></tr>`).join("")}
+      </tbody></table></div>
+    <div class="panel scroll"><h3>Freshness of the cached lines</h3><p class="sub">Last pull per league and how long it took</p>
+      <table><thead><tr><th>League</th><th>Pulled</th><th>Took</th><th>Rows</th><th>Notes</th></tr></thead><tbody>
+      ${d.freshness.map((x) => `<tr><td>${esc(x.name)}</td><td>${mt(x.scraped_at)}</td><td>${x.seconds != null ? x.seconds + " s" : "–"}</td><td>${num(x.rows)}</td><td>${x.errors ? `${x.errors} note${x.errors > 1 ? "s" : ""}` : ""}</td></tr>`).join("")}
+      </tbody></table></div>
+    <div class="panel scroll"><h3>Busiest endpoints, last 24 h</h3><p class="sub">By data sent</p>
+      <table><thead><tr><th>Path</th><th>Requests</th><th>Sent</th><th>Avg</th></tr></thead><tbody>
+      ${t.endpoints.map((x) => `<tr><td>${esc(x.path)}</td><td>${num(x.requests)}</td><td>${bytes(x.sent)}</td><td>${num(x.avg_ms)} ms</td></tr>`).join("")}
+      </tbody></table></div>
+    <div class="panel"><h3>Recent problems</h3><p class="sub">Newest first, from errors.log (last 7 days) · ${h.phone_reports} from phones</p>
+      <pre class="problems">${h.problems.length ? h.problems.map(esc).join("\n\n") : '<span class="none">Nothing logged. All clear.</span>'}</pre></div>
+  </div>`;
+  $("root").innerHTML = html;
+  $("upd").textContent = "Updated " + new Date(d.at).toLocaleTimeString("en-US", { timeZone: TZ, hour: "numeric", minute: "2-digit" }) + " MT";
+}
+
+async function load() {
+  $("refresh").disabled = true;
+  try {
+    const r = await fetch("/api/stats");
+    if (!r.ok) throw new Error(`The server answered ${r.status}`);
+    render(await r.json());
+    $("err").textContent = "";
+  } catch (e) {
+    $("err").textContent = "Couldn't load stats. " + errText(e);
+  } finally {
+    $("refresh").disabled = false;
+  }
+}
+$("refresh").addEventListener("click", load);
+let resizeT;
+addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => last && render(last), 150); });
+setInterval(() => { if (document.visibilityState === "visible") load(); }, 60000);
+load();
+</script>
+</body>
+</html>

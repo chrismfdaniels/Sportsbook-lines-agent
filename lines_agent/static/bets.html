@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>History</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=2">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b3a8f">
+<link rel="stylesheet" href="/theme.css">
+<script src="/report.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--card); border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top); }
+  .bar { max-width: 1100px; margin: 0 auto; padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+  h1 { margin: 0 8px 0 0; }
+  a.nav { color: var(--accent); text-decoration: none; font-weight: 600; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; background: transparent; color: var(--text); padding: 7px 12px; font: inherit; font-weight: 600; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
+  .btn { border: 1px solid var(--line); background: var(--card); color: var(--text); padding: 6px 11px; border-radius: 8px; font: inherit; cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+  .btn.win { color: var(--pos); font-weight: 600; }
+  .btn.loss { color: var(--neg); font-weight: 600; }
+  .btn.danger { color: var(--neg); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  label.f { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+  label.f input { width: 90px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); font: inherit; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .tile span { display: block; font-size: 12px; color: var(--muted); }
+  .tile b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .tile small { color: var(--muted); font-size: 12px; }
+  .pos { color: var(--pos); } .neg { color: var(--neg); }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-top: 12px; }
+  .panel h2 { font-size: 14px; margin: 0 0 8px; }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; height: 200px; overflow: visible; }
+  .chart .tip { position: absolute; pointer-events: none; background: var(--text); color: var(--bg); font-size: 12px; padding: 6px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -110%); }
+  .chart .empty { color: var(--muted); font-size: 13px; padding: 24px 0; text-align: center; }
+  .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 18px 0 10px; }
+  .list { display: grid; gap: 10px; }
+  .bet { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .bet.group { padding: 0; overflow: hidden; }
+  .group-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; padding: 10px 14px; background: var(--head); border-bottom: 1px solid var(--line); }
+  .group .leg { padding: 12px 14px; }
+  .group .leg + .leg { border-top: 1px solid var(--line); }
+  .row1 { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .pick { font-weight: 700; }
+  .pnl { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .meta { color: var(--muted); font-size: 12px; margin: 2px 0 8px; }
+  .figs { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; font-variant-numeric: tabular-nums; }
+  .figs span { color: var(--muted); }
+  .status { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; text-transform: uppercase; letter-spacing: .03em; border: 1px solid var(--line); color: var(--muted); }
+  .status.won { background: var(--best-bg); color: var(--best-text); border-color: transparent; }
+  .status.lost { color: var(--neg); border-color: currentColor; }
+  .status.open { color: var(--accent); border-color: currentColor; }
+  .status.live { color: var(--live); border-color: currentColor; }
+  .status.live::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 4px; vertical-align: 1px; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .status.live::before { animation: none; } }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .notes { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .empty { color: var(--muted); text-align: center; padding: 40px 16px; }
+  table.books { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  table.books th, table.books td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line); }
+  table.books th:first-child, table.books td:first-child { text-align: left; }
+  table.books th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  details.panel summary { cursor: pointer; font-weight: 700; }
+  dialog.edit { border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); padding: 18px; width: min(420px, calc(100vw - 32px)); }
+  dialog.edit::backdrop { background: rgba(0, 0, 0, .45); }
+  dialog.edit h2 { font-size: 16px; margin: 0 0 4px; }
+  dialog.edit .sub { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  dialog.edit .fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  dialog.edit label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  dialog.edit label.wide { grid-column: 1 / -1; }
+  dialog.edit input, dialog.edit select { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); font: inherit; font-size: 16px; }
+  dialog.edit .err { color: var(--neg); font-size: 13px; min-height: 18px; margin-top: 6px; }
+  dialog.edit .foot { display: flex; gap: 8px; margin-top: 10px; }
+  dialog.edit .foot .sp { flex: 1; }
+  @media (max-width: 700px) {
+    .bar { padding: 10px 12px; }
+    main { padding: 12px; }
+    .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tile b { font-size: 19px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="nav" href="/">‹ Lines</a>
+    <a class="nav" href="/ev">+EV Finder</a>
+    <a class="nav" href="/live">Live</a>
+    <a class="nav desk-only" href="/stats">Stats</a>
+    <h1>History</h1>
+    <label class="f">Starting bankroll $<input id="startBank" type="number" inputmode="decimal" step="10" min="0"></label>
+  </div>
+</header>
+<main>
+  <div class="tiles" id="tiles"></div>
+  <section class="panel" aria-labelledby="chartTitle">
+    <h2 id="chartTitle">Cumulative profit / loss (settled bets)</h2>
+    <div class="chart" id="chart"></div>
+  </section>
+  <div class="filters">
+    <div class="seg" role="group" aria-label="Status" id="fStatus"></div>
+    <div class="seg" role="group" aria-label="Type" id="fKind"></div>
+  </div>
+  <div class="list" id="list"></div>
+  <details class="panel" id="booksPanel">
+    <summary>By sportsbook</summary>
+    <div id="books" style="margin-top:8px; overflow-x:auto"></div>
+  </details>
+</main>
+<dialog class="edit" id="editDlg" aria-labelledby="editTitle">
+  <form method="dialog" id="editForm">
+    <h2 id="editTitle">Edit bet</h2>
+    <div class="sub" id="editSub"></div>
+    <div class="fields">
+      <label>Status<select id="eStatus">
+        <option value="open">Open</option><option value="won">Won</option><option value="lost">Lost</option>
+        <option value="push">Push / void</option><option value="cashout">Cashed out</option>
+      </select></label>
+      <label id="eCashWrap">Cash-out amount $<input id="eCash" type="number" inputmode="decimal" step="0.01" min="0"></label>
+      <label>Odds<input id="eOdds" inputmode="numeric"></label>
+      <label>Stake $<input id="eStake" type="number" inputmode="decimal" step="0.01" min="0.01"></label>
+      <label class="wide">Notes<input id="eNotes" maxlength="300"></label>
+    </div>
+    <div class="err" id="eErr" role="alert"></div>
+    <div class="foot"><button type="button" class="btn danger" id="eDelete">Delete</button><span class="sp"></span><button type="button" class="btn" id="eCancel">Cancel</button><button type="submit" class="btn primary" id="eSave">Save</button></div>
+  </form>
+</dialog>
+<script>
+// Every time on the page is US Mountain, whatever zone the device is in.
+const TZ = "America/Denver";
+// Safari says "Load failed" (Chrome "Failed to fetch") when the Mac can't be reached at all.
+const errText = (e) => e instanceof TypeError ? "Can't reach the Mac. It may be asleep or off, or the phone may be offline." : e.message;
+const $ = (id) => document.getElementById(id);
+const LEAGUE_SHORT = { NBA: "NBA", NFL: "NFL", NHL: "NHL", MLB: "MLB", NCAAF: "College FB", NCAAB: "Men's CBB", WNCAAB: "Women's CBB", NCAABASE: "College BSB" };
+const STATUS_NAME = { open: "Open", won: "Won", lost: "Lost", push: "Push", cashout: "Cashed out" };
+const st = { data: null, status: safeGet("bets.status", "all"), kind: safeGet("bets.kind", "all"), editing: null };
+
+function safeGet(k, d) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }
+function safeSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+const odds = (o) => (o > 0 ? "+" : "") + o;
+const cents = (x) => Math.round(x * 100) / 100 || 0;  // also turns -0 into 0
+const money = (x) => (cents(x) < 0 ? "−$" : "$") + Math.abs(cents(x)).toFixed(2);
+const signed = (x) => (cents(x) > 0 ? "+" : cents(x) < 0 ? "−" : "") + "$" + Math.abs(cents(x)).toFixed(2);
+const cls = (x) => (x > 0 ? "pos" : x < 0 ? "neg" : "");
+function decimalOdds(o) { return o > 0 ? 1 + o / 100 : 1 + 100 / Math.abs(o); }
+function parseOdds(v) {
+  const s = String(v).trim().toUpperCase().replace("−", "-");
+  if (s === "EVEN" || s === "EV") return 100;
+  const n = Number(s.replace("+", ""));
+  return Number.isInteger(n) && Math.abs(n) >= 100 ? n : null;
+}
+// Rough game lengths in hours, to tell whether a game is still being played
+const GAME_HOURS = { NFL: 3.5, NCAAF: 3.75, NBA: 2.5, NCAAB: 2.25, WNCAAB: 2.25, NHL: 2.75, MLB: 3.25, NCAABASE: 3.25 };
+function isLive(b) {
+  if (b.status !== "open" || !b.start_time) return false;
+  const start = new Date(b.start_time).getTime(), now = Date.now();
+  return start <= now && now < start + (GAME_HOURS[b.league] || 3) * 3600e3;
+}
+const liveTag = `<span class="status live" title="Game in progress (from its start time)">Live</span>`;
+const when = (iso) => iso ? new Date(iso).toLocaleString("en-US", { timeZone: TZ, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "";
+
+async function api(path, body) {
+  const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
+  const out = await r.json();
+  if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
+  return out;
+}
+
+async function load() {
+  try {
+    st.data = await api("/api/bets");
+    if (document.activeElement !== $("startBank")) $("startBank").value = st.data.starting_bankroll || "";
+    render();
+  } catch (e) {
+    $("list").innerHTML = `<div class="empty">Couldn't load bets: ${esc(errText(e))}</div>`;
+  }
+}
+
+function renderTiles() {
+  const d = st.data, t = d.total;
+  const rec = `${t.won}-${t.lost}${t.push ? "-" + t.push : ""}`;
+  const growth = d.starting_bankroll ? (d.bankroll - d.starting_bankroll) / d.starting_bankroll * 100 : null;
+  $("tiles").innerHTML = [
+    ["Bankroll", money(d.bankroll), d.starting_bankroll ? `from ${money(d.starting_bankroll)}${growth != null ? ` · ${growth >= 0 ? "+" : ""}${growth.toFixed(1)}%` : ""}` : "set a starting bankroll above", ""],
+    ["Settled profit / loss", signed(t.pnl), t.roi_pct != null ? `ROI ${t.roi_pct >= 0 ? "+" : ""}${t.roi_pct}% on ${money(t.staked)}` : "no settled bets yet", cls(t.pnl)],
+    ["In open bets", money(t.open_stake), `${t.bets - t.settled} open`, ""],
+    ["Record (W-L-P)", rec, `${t.settled} settled`, ""],
+    ["+EV bets", signed(d.ev.pnl), `expected ${signed(d.ev.expected)} from the edge · ${d.ev.settled} settled`, cls(d.ev.pnl)],
+    ["Arbitrage", signed(d.arb.pnl), `${d.arb.settled} legs settled`, cls(d.arb.pnl)],
+  ].map(([label, val, sub, c]) => `<div class="tile"><span>${label}</span><b class="${c}">${val}</b><small>${esc(sub)}</small></div>`).join("");
+}
+
+function renderChart() {
+  const pts = st.data.curve;
+  const el = $("chart");
+  if (pts.length < 1) { el.innerHTML = `<div class="empty">Settle a bet (Won / Lost / Push) to start the chart.</div>`; return; }
+  const all = [{ pnl: 0, at: null, id: "start" }, ...pts];
+  const W = el.clientWidth || 600, H = 200, padL = 52, padR = 12, padT = 10, padB = 22;
+  const vals = all.map((p) => p.pnl);
+  let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+  if (hi === lo) { hi += 1; lo -= 1; }
+  const span = hi - lo; hi += span * 0.08; lo -= span * 0.08;
+  const x = (i) => padL + (all.length === 1 ? 0 : i / (all.length - 1)) * (W - padL - padR);
+  const y = (v) => padT + (hi - v) / (hi - lo) * (H - padT - padB);
+  const ticks = [lo + (hi - lo) * 0.1, 0, hi - (hi - lo) * 0.1].filter((v, i, a) => i === 1 || Math.abs(v) > (hi - lo) * 0.15);
+  const path = all.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.pnl).toFixed(1)}`).join("");
+  const last = all[all.length - 1];
+  const lineColor = last.pnl >= 0 ? "var(--pos)" : "var(--neg)";
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cumulative profit and loss across ${pts.length} settled bets, now ${signed(last.pnl)}">
+    ${ticks.map((v) => `<line x1="${padL}" x2="${W - padR}" y1="${y(v)}" y2="${y(v)}" stroke="${v === 0 ? "var(--muted)" : "var(--grid)"}" stroke-width="1" ${v === 0 ? 'stroke-dasharray="3 3"' : ""}/>
+      <text x="${padL - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${signed(Math.round(v))}</text>`).join("")}
+    <text x="${padL}" y="${H - 4}" font-size="11" fill="var(--muted)">start</text>
+    <text x="${W - padR}" y="${H - 4}" font-size="11" fill="var(--muted)" text-anchor="end">bet ${pts.length}</text>
+    <path d="${path}" fill="none" stroke="${lineColor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${x(all.length - 1)}" cy="${y(last.pnl)}" r="4" fill="${lineColor}" stroke="var(--card)" stroke-width="2"/>
+    <text x="${Math.min(x(all.length - 1), W - padR - 4)}" y="${y(last.pnl) - 10}" text-anchor="end" font-size="12" font-weight="700" fill="var(--text)">${signed(last.pnl)}</text>
+    <line id="xhair" y1="${padT}" y2="${H - padB}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/>
+    <circle id="xdot" r="4" fill="${lineColor}" stroke="var(--card)" stroke-width="2" visibility="hidden"/>
+    <rect x="${padL}" y="0" width="${W - padL - padR}" height="${H}" fill="transparent" id="hit"/>
+  </svg><div class="tip" id="tip" hidden></div>`;
+  const svg = el.querySelector("svg"), tip = $("tip");
+  const byId = Object.fromEntries(st.data.bets.map((b) => [b.id, b]));
+  const move = (ev) => {
+    const r = svg.getBoundingClientRect();
+    const px = (ev.clientX - r.left) * W / r.width;
+    const i = Math.max(0, Math.min(all.length - 1, Math.round((px - padL) / (W - padL - padR) * (all.length - 1))));
+    const p = all[i];
+    for (const id of ["xhair", "xdot"]) svg.getElementById(id).setAttribute("visibility", "visible");
+    svg.getElementById("xhair").setAttribute("x1", x(i)); svg.getElementById("xhair").setAttribute("x2", x(i));
+    svg.getElementById("xdot").setAttribute("cx", x(i)); svg.getElementById("xdot").setAttribute("cy", y(p.pnl));
+    const b = byId[p.id];
+    tip.hidden = false;
+    tip.style.left = `${x(i) / W * r.width}px`; tip.style.top = `${y(p.pnl) / H * r.height}px`;
+    tip.innerHTML = i === 0 ? "Start · $0.00" : `<b>${signed(p.pnl)}</b> after bet ${i}<br>${esc(b ? `${b.pick} · ${STATUS_NAME[b.status]} ${signed(b.profit)}` : "")}<br>${when(p.at)}`;
+  };
+  const hide = () => { tip.hidden = true; for (const id of ["xhair", "xdot"]) svg.getElementById(id).setAttribute("visibility", "hidden"); };
+  svg.getElementById("hit").addEventListener("pointermove", move);
+  svg.getElementById("hit").addEventListener("pointerleave", hide);
+}
+
+function betBody(b) {
+  const toWin = b.stake * (decimalOdds(b.odds) - 1);
+  const meta = [b.book, LEAGUE_SHORT[b.league] || b.league, b.away_team && `${b.away_team} @ ${b.home_team}`, b.start_time && when(b.start_time),
+    `placed ${when(b.placed_at)}`].filter(Boolean).map(esc).join(" · ");
+  const evBits = b.kind === "ev" && b.ev_pct != null
+    ? `<span>EV</span> ${b.ev_pct >= 0 ? "+" : ""}${b.ev_pct}%${b.methods ? ` <span>(M ${b.methods.multiplicative ?? "–"} / S ${b.methods.shin ?? "–"} / P ${b.methods.power ?? "–"})</span>` : ""}` : "";
+  const actions = b.status === "open"
+    ? `<button class="btn win" data-settle="won" data-id="${b.id}">Won</button><button class="btn loss" data-settle="lost" data-id="${b.id}">Lost</button><button class="btn" data-settle="push" data-id="${b.id}">Push</button><button class="btn" data-edit="${b.id}">Cash out / edit</button>`
+    : `<button class="btn" data-settle="open" data-id="${b.id}">Reopen</button><button class="btn" data-edit="${b.id}">Edit</button>`;
+  return `<div class="row1"><div class="pick">${esc(b.pick)} <span class="status ${b.status}">${STATUS_NAME[b.status]}</span>${isLive(b) ? " " + liveTag : ""}</div>
+      <div class="pnl ${cls(b.profit)}">${b.profit == null ? `to win ${money(toWin)}` : signed(b.profit)}</div></div>
+    <div class="meta">${meta}</div>
+    <div class="figs"><div><span>Odds</span> ${odds(b.odds)}</div><div><span>Stake</span> ${money(b.stake)}</div>${b.fair_odds != null ? `<div><span>Fair</span> ${odds(b.fair_odds)}</div>` : ""}${evBits ? `<div>${evBits}</div>` : ""}${b.status === "cashout" ? `<div><span>Cashed out</span> ${money(b.cashout)}</div>` : ""}</div>
+    ${b.notes ? `<div class="notes">${esc(b.notes)}</div>` : ""}
+    <div class="actions">${actions}</div>`;
+}
+
+function renderList() {
+  const d = st.data;
+  $("fStatus").innerHTML = [["all", "All"], ["open", "Open"], ["settled", "Settled"]].map(([k, n]) => `<button data-fstatus="${k}" aria-pressed="${st.status === k}">${n}</button>`).join("");
+  $("fKind").innerHTML = [["all", "All types"], ["ev", "+EV"], ["arb", "Arbitrage"]].map(([k, n]) => `<button data-fkind="${k}" aria-pressed="${st.kind === k}">${n}</button>`).join("");
+  const keep = (b) => (st.kind === "all" || b.kind === st.kind);
+  // An arbitrage shows as one card with both legs; it's open until both are settled.
+  const items = [], groups = {};
+  for (const b of d.bets.filter(keep)) {
+    if (b.group) { if (!groups[b.group]) { groups[b.group] = []; items.push({ group: b.group }); } groups[b.group].push(b); }
+    else items.push({ bet: b });
+  }
+  const isOpen = (it) => it.bet ? it.bet.status === "open" : groups[it.group].some((b) => b.status === "open");
+  const shown = items.filter((it) => st.status === "all" || (st.status === "open") === isOpen(it));
+  if (!shown.length) {
+    $("list").innerHTML = `<div class="empty">${d.bets.length ? "No bets match these filters." : "No bets tracked yet. Press <b>Track bet</b> on a +EV card or <b>Track arb</b> on an arbitrage card after you place it."}</div>`;
+    return;
+  }
+  $("list").innerHTML = shown.map((it) => {
+    if (it.bet) return `<article class="bet">${betBody(it.bet)}</article>`;
+    const legs = groups[it.group];
+    const staked = legs.reduce((s, b) => s + b.stake, 0);
+    const done = legs.every((b) => b.status !== "open");
+    const pnl = legs.reduce((s, b) => s + (b.profit || 0), 0);
+    const worst = Math.min(...legs.map((b) => b.stake * decimalOdds(b.odds))) - staked;
+    return `<article class="bet group"><div class="group-head"><div><b>${esc(it.group)}</b> · arbitrage · staked ${money(staked)}${legs.some(isLive) ? " " + liveTag : ""}</div>
+      <div class="pnl ${done ? cls(pnl) : ""}">${done ? signed(pnl) : `locks ${signed(worst)}`}</div></div>
+      ${legs.map((b) => `<div class="leg">${betBody(b)}</div>`).join("")}</article>`;
+  }).join("");
+}
+
+function renderBooks() {
+  const rows = Object.entries(st.data.by_book);
+  $("books").innerHTML = rows.length ? `<table class="books"><thead><tr><th>Book</th><th>Bets</th><th>Settled</th><th>Staked</th><th>P/L</th><th>ROI</th><th>Open</th></tr></thead><tbody>
+    ${rows.map(([bk, t]) => `<tr><td>${esc(bk)}</td><td>${t.bets}</td><td>${t.settled}</td><td>${money(t.staked)}</td><td class="${cls(t.pnl)}">${signed(t.pnl)}</td><td>${t.roi_pct != null ? t.roi_pct + "%" : "–"}</td><td>${money(t.open_stake)}</td></tr>`).join("")}
+    </tbody></table>` : `<div class="empty" style="padding:12px">No bets yet.</div>`;
+}
+
+function render() { renderTiles(); renderChart(); renderList(); renderBooks(); }
+
+async function settle(id, status) {
+  try { await api("/api/bets/update", { id, status }); await load(); }
+  catch (e) { alert(`Couldn't update: ${errText(e)}`); }
+}
+
+function openEdit(id) {
+  const b = st.data.bets.find((x) => x.id === id);
+  st.editing = b;
+  $("editSub").textContent = `${b.pick} · ${b.book}${b.group ? " · " + b.group : ""}`;
+  $("eStatus").value = b.status === "open" ? "cashout" : b.status;
+  $("eCash").value = b.cashout ?? "";
+  $("eOdds").value = odds(b.odds); $("eStake").value = b.stake; $("eNotes").value = b.notes || "";
+  $("eErr").textContent = "";
+  syncCash();
+  $("editDlg").showModal();
+}
+function syncCash() { $("eCashWrap").style.visibility = $("eStatus").value === "cashout" ? "visible" : "hidden"; }
+
+$("editForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const o = parseOdds($("eOdds").value), s = parseFloat($("eStake").value), status = $("eStatus").value;
+  if (!o) { $("eErr").textContent = "Enter American odds, like -110 or +150."; return; }
+  if (!(s > 0)) { $("eErr").textContent = "Enter the stake."; return; }
+  const body = { id: st.editing.id, odds: o, stake: s, notes: $("eNotes").value, status };
+  if (status === "cashout") {
+    const c = parseFloat($("eCash").value);
+    if (!(c >= 0)) { $("eErr").textContent = "Enter the cash-out amount the book paid."; return; }
+    body.cashout = c;
+  }
+  try { await api("/api/bets/update", body); $("editDlg").close(); await load(); }
+  catch (err) { $("eErr").textContent = `Couldn't save: ${errText(err)}`; }
+});
+$("eDelete").addEventListener("click", async () => {
+  if (!confirm(`Delete this bet (${st.editing.pick})? This can't be undone.`)) return;
+  try { await api("/api/bets/delete", { id: st.editing.id }); $("editDlg").close(); await load(); }
+  catch (err) { $("eErr").textContent = `Couldn't delete: ${errText(err)}`; }
+});
+$("eCancel").addEventListener("click", () => $("editDlg").close());
+$("eStatus").addEventListener("change", syncCash);
+$("startBank").addEventListener("change", async () => {
+  // An emptied or unreadable box puts the saved amount back instead of saving $0,
+  // which would shrink every stake the +EV page suggests.
+  const v = parseFloat($("startBank").value);
+  if (!(v >= 0)) { $("startBank").value = st.data?.starting_bankroll || ""; return; }
+  try { await api("/api/bets/bankroll", { starting: v }); await load(); }
+  catch (e) { alert(`Couldn't save bankroll: ${errText(e)}`); }
+});
+document.addEventListener("click", (e) => {
+  const s = e.target.closest("[data-settle]"), ed = e.target.closest("[data-edit]");
+  const fs = e.target.closest("[data-fstatus]"), fk = e.target.closest("[data-fkind]");
+  if (s) settle(s.dataset.id, s.dataset.settle);
+  if (ed) openEdit(ed.dataset.edit);
+  if (fs) { st.status = fs.dataset.fstatus; safeSet("bets.status", st.status); renderList(); }
+  if (fk) { st.kind = fk.dataset.fkind; safeSet("bets.kind", st.kind); renderList(); }
+});
+let resizeT;
+window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => st.data && renderChart(), 150); });
+load();
+setInterval(() => st.data && renderList(), 60000);  // games go live and finish
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+</script>
+</body>
+</html>
