@@ -13,8 +13,9 @@ Pulls pregame **moneyline, spread and total** lines for **NBA, NFL, NHL, MLB, co
 | BetMGM | The Odds API | `ODDS_API_KEY` (free plan OK) |
 | Caesars | The Odds API (`williamhill_us`) | `ODDS_API_KEY` on a paid plan |
 | Fanatics | The Odds API | `ODDS_API_KEY` on a paid plan |
+| Bally Bet | The Odds API (`ballybet`) | `ODDS_API_KEY` (works on the current paid plan; free plan not checked) |
 
-DraftKings, BetMGM and Caesars return HTTP 403 (Akamai / Cloudflare / CloudFront bot protection) to automated clients, even a real headless browser, and Fanatics' website doesn't serve its own lines. Rather than try to get around that protection, the agent gets these four books from [The Odds API](https://the-odds-api.com), a licensed feed. Any book that comes back empty is listed at the end of each run.
+DraftKings, BetMGM and Caesars return HTTP 403 (Akamai / Cloudflare / CloudFront bot protection) to automated clients, even a real headless browser, and Fanatics' website doesn't serve its own lines. Rather than try to get around that protection, the agent gets these four books from [The Odds API](https://the-odds-api.com), a licensed feed. Bally Bet comes from the same feed: it's in the same request as the others (6 bookmakers counting Pinnacle, under the feed's 10-per-credit limit), so it costs no extra credits. Any book that comes back empty is listed at the end of each run.
 
 **Bet365 isn't covered.** The Odds API has no US Bet365 feed on any plan (checked across all 74 bookmakers in every region, Oct 2026), and Bet365's own site sits behind a Cloudflare challenge.
 
@@ -47,7 +48,7 @@ cp .env.example .env   # then paste your ODDS_API_KEY
 .venv/bin/python -m lines_agent.web          # then open http://127.0.0.1:8765/
 ```
 
-Pick a league to see every game's moneyline, spread and total across all seven books, with the best price in each column highlighted. The page only answers on this machine (127.0.0.1). A league is scraped the first time you pick it and then cached. **Refresh** scrapes it again from the books and markets switched on in Scan controls, which takes about 15 seconds and uses up to 3 Odds API credits.
+Pick a league to see every game's moneyline, spread and total across all eight books, with the best price in each column highlighted. The page only answers on this machine (127.0.0.1). A league is scraped the first time you pick it and then cached. **Refresh** scrapes it again from the books and markets switched on in Scan controls, which takes about 15 seconds and uses up to 3 Odds API credits.
 
 ### Mac app
 
@@ -64,7 +65,7 @@ macapp/build.sh
 The top of the arbitrage pane has toggles for what a scan pulls:
 
 - **Sports:** the six leagues
-- **Books:** the seven books. Books marked **API** come from The Odds API and cost credits; the others are free.
+- **Books:** the eight books. Books marked **API** come from The Odds API and cost credits; the others are free.
 - **Game lines:** moneyline, spread, total. Each one is a separate Odds API credit per league.
 - **Player props:** assists, rebounds, steals, turnovers. Each one costs up to a credit per basketball game.
 
@@ -85,7 +86,7 @@ Profit = `1 / (1/dec_a + 1/dec_b) − 1`. Before you bet, check both prices stil
 
 ### +EV finder
 
-**http://127.0.0.1:8765/ev** (or **+EV Finder** at the top of the main page) lists lines at your seven books that beat a sharp **consensus fair price** by at least 5% (adjustable), for NBA, NFL, NHL, college football and men's and women's college basketball.
+**http://127.0.0.1:8765/ev** (or **+EV Finder** at the top of the main page) lists lines at your eight books that beat a sharp **consensus fair price** by at least 5% (adjustable), for NBA, NFL, NHL, college football and men's and women's college basketball.
 
 1. Each sharp price becomes an implied probability, `p = 1 / decimal odds`.
 2. The vig is removed three ways, each sharp book on its own:
@@ -123,7 +124,7 @@ Scheduled runs post a Mac notification and a phone push (opening the +EV page) w
 - Games that have finished but whose bets you haven't settled show below, graded Won / Lost from the final score. Settle them right there with the same **Won**, **Lost**, **Push** and **Cash out / edit** choices as History; the one matching the final score is outlined, and **Undo** (for a few seconds) reopens the bet. Player props show the score but no arrow (there are no live player stats).
 - Scores come from ESPN's free public scoreboard (no Odds API credits) and refresh every 30 seconds while the page is open.
 
-Bets are stored on the Mac in `data/bets.json`, so the phone, browser and app share them. They don't sync to `Project Trackers/bet_tracker.xlsx`.
+Bets are stored on the Mac in `data/app.db`, one account per person, so the phone, browser and app share them. They don't sync to `Project Trackers/bet_tracker.xlsx`.
 
 ### Basketball player props
 
@@ -134,7 +135,7 @@ For NBA and men's and women's college basketball, the agent also collects player
 | FanDuel | event-page API, Player Assists / Rebounds / Defense tabs | assists, rebounds, steals |
 | BetRivers | Kambi event offers | assists, rebounds (O/U and N+), steals (N+ only) |
 | theScore Bet | each game's prop sections, in the browser | assists, rebounds (O/U and N+), steals (N+) |
-| DraftKings, BetMGM, Caesars, Fanatics | The Odds API, on via `ODDS_API_PROPS=1` in `.env` | up to 4 credits per game per run (one per stat market returned) |
+| DraftKings, BetMGM, Caesars, Fanatics, Bally Bet | The Odds API, on via `ODDS_API_PROPS=1` in `.env` | up to 4 credits per game per run (one per stat market returned) |
 
 Turnovers are collected, but no book had posted any when this was written. A milestone bet and an O/U at another book can settle differently if a player doesn't play, so check both books' rules before betting a pair that uses one. Books post props on game day, usually in the morning, so the 7:07 MT run may land before some books have posted. Many states don't allow college player props.
 
@@ -206,6 +207,24 @@ Add a module in `lines_agent/books/` with `NAME` and `fetch(league, **kw) -> lis
 ## Stats (desktop)
 
 **Stats** (http://127.0.0.1:8765/stats, linked on the Mac only: the link is hidden on phones and tablets) shows how the app is running: disk use by part, the server's memory and uptime, Odds API credits left and used per day, requests, errors and response times over the last 24 hours, data per page open on the phone (compressed vs not) and what the phone keeps offline, scrape and scheduled-run health over the last 7 days, push alerts, how fresh each league's cached lines are, results by sportsbook, and the newest entries in errors.log. It reads the files and logs that already exist and refreshes every minute while open.
+
+## Private app security
+
+The private server has no login, so it relies on listening only on this Mac and Tailscale. It also refuses other websites: a request must be addressed to `127.0.0.1`, `localhost` or the Tailscale name (add more with `PRIVATE_HOSTS` in `.env`), and any POST or `/api/` request a browser marks as cross-site is rejected. The Mac app and command-line tools aren't affected. If the Tailscale machine name ever changes, update `PRIVATE_HOSTS`.
+
+## Public site
+
+`lines_agent/public.py` is a separate program that shows **History** and **Live** through Cloudflare, for one or several people. Cloudflare Access handles the login; the program checks Access's signed token on every request, and each person sees and changes only their own bets and bankroll. It can't start a scan or spend Odds API credits, and never loads the API key or the scraping code. The private server, Mac app and Tailscale phone app are unchanged and use the owner's account.
+
+- **Adding a bet:** **Add a bet** on History takes the game from ESPN's free schedule, then the market, pick, line, book, odds and stake. Live grades these like any other bet.
+- **Setup:** `data/public_site.json` holds `team_domain`, `aud` (the Access application's audience tag) and `owner_email` (sees the bets the Mac tracks). Without a valid file the program stops rather than start unprotected.
+- **Adding a person:** open **People with access** on the private History page and enter their email. The Mac adds them to the Cloudflare Access group the login rule uses, so nobody edits Cloudflare by hand. **Remove** ends their access at once and keeps their bets in case you invite them back. This needs `CF_API_TOKEN` (limited to "Access: Groups", Read and Edit), `CF_ACCOUNT_ID` and `CF_ACCESS_GROUP_ID` in `.env`, which only the private server reads.
+- **Run:** `launchd/com.sportsbook-lines-public.plist` keeps it running on `127.0.0.1:8766`. Only Cloudflare's connector on this Mac talks to it.
+- **Logs:** `public.log` and `public-errors.log`, next to the others.
+- **Off switch:** `launchctl bootout gui/$(id -u)/com.sportsbook-lines-public` stops the public site at once and leaves the private app running. `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.sportsbook-lines-public.plist` turns it back on.
+- **Tests:** `.venv/bin/python -m unittest tests.test_public`
+
+The bets database is copied daily to `data/backups/` (kept 90 days). That's the same drive, so it protects against a bad edit or a damaged file, not against losing the disk.
 
 ## Logs
 

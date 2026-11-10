@@ -22,6 +22,7 @@ Serves the odds page at http://127.0.0.1:<port>/ and a JSON endpoint:
   POST /api/bets/bankroll              {"starting": 300}
   GET /stats, /api/stats               app health: disk, memory, credits, traffic, scrapes, results (stats.py)
   GET /live, /api/live                 open bets on games under way, with live scores (scores.py)
+  GET /api/members, POST /api/members/invite|remove   who can use the public site (invites.py)
   POST /api/log                        error reports from the phone app, written to the Mac's log (logs.py)
 
 Every request is logged with its status, size and time taken (logs.py).
@@ -35,23 +36,22 @@ It also re-scrapes every league at the --schedule times (see schedule.py).
 from __future__ import annotations
 
 import argparse
-import gzip
 import json
 import logging
 import math
-import sys
+import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlparse, urlsplit
 
-from . import agent, ev, logs, props, push, schedule, scores, settings, stats, tracker
+from . import agent, ev, invites, logs, props, push, schedule, scores, settings, stats, tracker
 from .__main__ import _load_env
 from .arbitrage import find_arbs, find_prop_arbs
 from .books import ALL_BOOKS, SHARP, VIA_ODDS_API
+from .httpd import BaseHandler, Server
 from .matching import unify_games
 from .models import LEAGUES, Line
 
@@ -284,10 +284,14 @@ def _profile_from_query(q: dict) -> dict | None:
 
 
 def _housekeeping():
-    """Daily at 3:30 MT (and once shortly after start): delete line history older
-    than agent.HISTORY_DAYS."""
+    """Daily at 3:30 MT (and once shortly after start): back up the bets database and
+    delete line history older than agent.HISTORY_DAYS."""
     time.sleep(120)  # let startup and any catch-up run go first
     while True:
+        try:
+            log.info("Bets backed up to %s", tracker.backup())
+        except Exception:
+            log.exception("Backing up bets failed")
         try:
             r = agent.prune_history(ROOT / "data")
             if r["rows_removed"] or r["snapshots_removed"]:
@@ -315,71 +319,35 @@ def _scan_now(min_profit: float, notify: bool = True):
                      kwargs={"notify": notify}).start()
 
 
-# Pages and data shrink to roughly a tenth gzipped, which matters on cellular.
-# Images are already compressed, and tiny bodies aren't worth it.
-COMPRESS_MIN = 1024
+# Names this server may be addressed by; PRIVATE_HOSTS in .env adds more (comma-separated).
+# Anything else is a website pointing its own domain at this Mac (DNS rebinding).
+PRIVATE_HOSTS = ("127.0.0.1", "localhost", "mac-mini.tail839a81.ts.net")
 
 
-def _compressible(ctype: str) -> bool:
-    return ctype.startswith("text/") or any(t in ctype for t in ("json", "javascript", "manifest"))
-
-
-# A read slower than this is logged as a warning (it's what makes the phone give
-# up with "Load failed"). Refreshes and scans legitimately take longer.
-SLOW_MS = 3000
-
-
-class Handler(BaseHTTPRequestHandler):
-    def _send(self, code: int, body: bytes, ctype: str):
-        self._status, self._size, self._raw = code, len(body), None
-        zipped = (len(body) >= COMPRESS_MIN and _compressible(ctype)
-                  and "gzip" in self.headers.get("Accept-Encoding", "").lower())
-        if zipped:
-            self._raw = len(body)
-            body = gzip.compress(body, compresslevel=5)
-            self._size = len(body)
-        try:
-            self.send_response(code)
-            self.send_header("Content-Type", ctype)
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            if _compressible(ctype):
-                self.send_header("Vary", "Accept-Encoding")
-            if zipped:
-                self.send_header("Content-Encoding", "gzip")
-            self.end_headers()
-            self.wfile.write(body)
-        except (BrokenPipeError, ConnectionResetError, TimeoutError):
-            self._status = f"{code} (client gone)"  # the page was closed or reloaded mid-response
-
-    def _dispatch(self, handler):
-        """Run a request so that any error still answers (a 500 with the reason)
-        instead of dropping the connection, which the phone shows as "Load failed",
-        and log one line for it."""
-        started = time.monotonic()
-        self._status, self._size, self._raw = None, 0, None
-        try:
-            handler()
-        except Exception as e:
-            log.exception("%s %s failed", self.command, self.path[:200])
-            if self._status is None:
-                self._send(500, json.dumps({"error": f"server error: {type(e).__name__}: {e}"[:300]}).encode(),
-                           "application/json")
-        ms = (time.monotonic() - started) * 1000
-        slow = ms > SLOW_MS and "refresh=1" not in self.path and self.path not in ("/api/scan",)
-        status = self._status if self._status is not None else "no response"
-        level = logging.WARNING if slow or (isinstance(status, int) and status >= 500) else logging.INFO
-        size = f"{_size(self._raw)}->{_size(self._size)} gz" if self._raw else _size(self._size)
-        log.log(level, "%s %s %s %s %.0fms %s%s", self.command, self.path[:200], status, size, ms,
-                logs.device(self.headers.get("User-Agent", "")), " SLOW" if slow else "")
-
-    def do_GET(self):
-        self._dispatch(self._get)
-
-    def do_POST(self):
-        self._dispatch(self._post)
+class Handler(BaseHandler):
+    def _refuse_foreign(self) -> bool:
+        """This server has no login, so it must not act for other websites open in
+        a browser. Answers 403 and returns True for a request from one. Browsers
+        always label cross-site requests; the Mac app and command-line tools send no
+        such labels and are unaffected."""
+        host = self.headers.get("Host", "")
+        extra = [h.strip() for h in os.environ.get("PRIVATE_HOSTS", "").split(",") if h.strip()]
+        if urlsplit("//" + host).hostname not in (*PRIVATE_HOSTS, *extra):
+            log.warning("Refused a request addressed to an unknown host")
+            self._send(403, b'{"error":"unknown host"}', "application/json")
+            return True
+        if self.command == "POST" or urlparse(self.path).path.startswith("/api/"):
+            origin = self.headers.get("Origin")
+            if (origin is not None and urlparse(origin).netloc != host) \
+                    or self.headers.get("Sec-Fetch-Site") in ("cross-site", "same-site"):
+                log.warning("Refused a cross-site %s %s", self.command, urlparse(self.path).path)
+                self._send(403, b'{"error":"cross-site request refused"}', "application/json")
+                return True
+        return False
 
     def _get(self):
+        if self._refuse_foreign():
+            return
         url = urlparse(self.path)
         if url.path in ("/", "/index.html"):
             return self._send(200, (STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
@@ -398,6 +366,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, json.dumps(tracker.summary()).encode(), "application/json")
         if url.path == "/api/live":
             return self._send(200, json.dumps(scores.live()).encode(), "application/json")
+        if url.path == "/api/members":
+            out = {"members": tracker.members(), "problem": invites.check()}
+            return self._send(200, json.dumps(out).encode(), "application/json")
         if url.path == "/api/ev":
             q = parse_qs(url.query)
             try:
@@ -463,6 +434,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send(404, b"not found", "text/plain")
 
     def _post(self):
+        if self._refuse_foreign():
+            return
         url = urlparse(self.path)
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -499,6 +472,10 @@ class Handler(BaseHTTPRequestHandler):
                 out = {"deleted": body.get("id")}
             elif url.path == "/api/bets/bankroll":
                 out = {"starting_bankroll": tracker.set_bankroll(body.get("starting", 0))}
+            elif url.path == "/api/members/invite":
+                out = {"invited": invites.invite(body.get("email"))}
+            elif url.path == "/api/members/remove":
+                out = {"removed": invites.remove(body.get("email"))}
             elif url.path == "/api/push/test":
                 out = push.send_all("Sportsbook Lines", "Test alert: notifications are working.", tag="test")
             elif url.path == "/api/log":
@@ -509,13 +486,6 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, json.dumps({"error": str(e)}).encode(), "application/json")
         self._send(200, json.dumps(out).encode(), "application/json")
 
-    def log_request(self, code="-", size="-"):
-        pass  # _dispatch logs each request, with its timing
-
-    def log_message(self, fmt, *args):
-        # What http.server still reports itself: malformed requests, unsupported methods
-        log.warning("http: %s", fmt % args)
-
 
 def _finite(v: str) -> float:
     """A query-string number; "nan" and "inf" parse as floats but would break the
@@ -524,23 +494,6 @@ def _finite(v: str) -> float:
     if not math.isfinite(x):
         raise ValueError(f"bad number {v!r}")
     return x
-
-
-def _size(n: int) -> str:
-    return f"{n}B" if n < 1024 else f"{n / 1024:.1f}KB" if n < 1024 * 1024 else f"{n / 1048576:.1f}MB"
-
-
-class Server(ThreadingHTTPServer):
-    daemon_threads = True
-
-    def handle_error(self, request, client_address):
-        # Errors outside a handler (reading the request): a phone dropping off
-        # mid-request is routine; anything else gets its traceback in the log.
-        exc = sys.exc_info()[1]
-        if isinstance(exc, (BrokenPipeError, ConnectionResetError, TimeoutError)):
-            log.info("Client hung up mid-request (%s)", type(exc).__name__)
-        else:
-            log.exception("Request from %s failed outside its handler", client_address[0])
 
 
 def main():

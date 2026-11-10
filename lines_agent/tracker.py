@@ -1,8 +1,15 @@
-"""Bets you actually placed, for tracking profit and loss. Stored in
-data/bets.json so the page, the phone and the Mac app share them.
+"""Bets you actually placed, for tracking profit and loss. Stored per person in
+data/app.db (SQLite), shared by the private server and the public site.
 
-  {"starting_bankroll": 300.0,
-   "bets": [{"id": "B12", "group": "ARB-3" | null, "kind": "ev" | "arb", ...}]}
+  users: user, starting_bankroll
+  bets:  user, id, data = {"id": "B12", "group": "ARB-3" | null,
+                           "kind": "ev" | "arb" | "manual", ...}
+
+"owner" is the Mac's owner, the only account the private server uses; on the
+public site each signed-in email is its own account. Every function works on one
+user's bets, so one person's actions can't reach another's. SQLite's locks keep
+the two programs from overwriting each other. On first use, an existing
+data/bets.json becomes the owner's account and is renamed bets.pre-database.json.
 
 A bet is one wager at one book. An arbitrage is two bets with the same
 "group". Settling a bet sets its status:
@@ -17,17 +24,25 @@ from __future__ import annotations
 
 import json
 import math
+import re
+import sqlite3
 import threading
-from datetime import datetime, timezone
+from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from .arbitrage import decimal
 
-FILE = Path(__file__).resolve().parent.parent / "data" / "bets.json"
+DATA = Path(__file__).resolve().parent.parent / "data"
+DB = DATA / "app.db"
+FILE = DATA / "bets.json"  # only read once, to bring existing bets into the database
+OWNER = "owner"
+KINDS = ("ev", "arb", "manual")
 STATUSES = ("open", "won", "lost", "push", "cashout")
 # Copied from the card that was tracked, so the tracker can show what the bet looked like
 CONTEXT = ("league", "away_team", "home_team", "start_time", "market", "side", "line",
            "player", "stat", "fair_odds", "ev_pct", "method", "methods", "kelly_pct", "profit_pct")
+BACKUP_DAYS = 90
 _lock = threading.Lock()
 
 
@@ -35,19 +50,84 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def _load() -> dict:
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (user TEXT PRIMARY KEY, starting_bankroll REAL NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS bets (user TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY (user, id));
+CREATE TABLE IF NOT EXISTS members (email TEXT PRIMARY KEY, added_at TEXT NOT NULL);
+"""
+_prepared: set = set()
+
+
+def _connect() -> sqlite3.Connection:
+    DB.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB, timeout=15, isolation_level=None)  # transactions are explicit
+    if DB not in _prepared:
+        with _lock:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.executescript(SCHEMA)
+            _import_json(conn)
+            _prepared.add(DB)
+    return conn
+
+
+def _import_json(conn: sqlite3.Connection):
+    """Bring the old bets.json into the database as the owner's account, once."""
+    conn.execute("BEGIN IMMEDIATE")
     try:
-        data = json.loads(FILE.read_text())
-        return {"starting_bankroll": float(data.get("starting_bankroll") or 0), "bets": list(data.get("bets", []))}
-    except (OSError, ValueError):
-        return {"starting_bankroll": 0.0, "bets": []}
+        done = conn.execute("SELECT 1 FROM users WHERE user = ?", (OWNER,)).fetchone()
+        if done or not FILE.exists():
+            conn.execute("COMMIT")
+            return
+        old = json.loads(FILE.read_text())  # a damaged file stops here rather than start empty
+        _write(conn, OWNER, {"starting_bankroll": float(old.get("starting_bankroll") or 0),
+                             "bets": list(old.get("bets", []))})
+        conn.execute("COMMIT")
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    FILE.replace(FILE.with_name("bets.pre-database.json"))
 
 
-def _store(data: dict):
-    FILE.parent.mkdir(parents=True, exist_ok=True)
-    tmp = FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=1))
-    tmp.replace(FILE)
+def _read(conn: sqlite3.Connection, user: str) -> dict:
+    row = conn.execute("SELECT starting_bankroll FROM users WHERE user = ?", (user,)).fetchone()
+    bets = [json.loads(r[0]) for r in conn.execute("SELECT data FROM bets WHERE user = ? ORDER BY rowid", (user,))]
+    return {"starting_bankroll": row[0] if row else 0.0, "bets": bets}
+
+
+def _write(conn: sqlite3.Connection, user: str, data: dict):
+    conn.execute("INSERT INTO users (user, starting_bankroll) VALUES (?, ?) "
+                 "ON CONFLICT (user) DO UPDATE SET starting_bankroll = excluded.starting_bankroll",
+                 (user, data["starting_bankroll"]))
+    conn.execute("DELETE FROM bets WHERE user = ?", (user,))
+    conn.executemany("INSERT INTO bets (user, id, data) VALUES (?, ?, ?)",
+                     [(user, b["id"], json.dumps(b)) for b in data["bets"]])
+
+
+def _load(user: str = OWNER) -> dict:
+    conn = _connect()
+    try:
+        return _read(conn, user)
+    finally:
+        conn.close()
+
+
+@contextmanager
+def _tx(user: str = OWNER):
+    """One user's data, saved when the block ends. Nothing else can write until
+    then (in this program or the other), and an error saves nothing."""
+    conn = _connect()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            data = _read(conn, user)
+            yield data
+            _write(conn, user, data)
+            conn.execute("COMMIT")
+        except BaseException:
+            conn.execute("ROLLBACK")
+            raise
+    finally:
+        conn.close()
 
 
 def _odds(v) -> int:
@@ -85,13 +165,12 @@ def _next_id(bets: list[dict], prefix: str, key: str) -> str:
     return f"{prefix}{max(nums, default=0) + 1}"
 
 
-def add(kind: str, legs: list[dict], notes: str = "") -> list[dict]:
-    """Track a placed bet: kind "ev" with one leg, or "arb" with two. Each leg is
+def add(kind: str, legs: list[dict], notes: str = "", user: str = OWNER) -> list[dict]:
+    """Track a placed bet: kind "ev" or "manual" with one leg, or "arb" with two. Each leg is
     {"book", "odds", "stake", "pick"} plus the card's context fields (CONTEXT)."""
-    if kind not in ("ev", "arb") or len(legs) != (1 if kind == "ev" else 2):
-        raise ValueError("an EV bet has one leg, an arbitrage two")
-    with _lock:
-        data = _load()
+    if kind not in KINDS or len(legs) != (2 if kind == "arb" else 1):
+        raise ValueError("a single bet has one leg, an arbitrage two")
+    with _tx(user) as data:
         group = _next_id(data["bets"], "ARB-", "group") if kind == "arb" else None
         added = []
         for leg in legs:
@@ -107,14 +186,12 @@ def add(kind: str, legs: list[dict], notes: str = "") -> list[dict]:
             }
             added.append(bet)
         data["bets"] += added
-        _store(data)
     return added
 
 
-def update(bet_id: str, changes: dict) -> dict:
+def update(bet_id: str, changes: dict, user: str = OWNER) -> dict:
     """Settle or correct a bet: status, cashout, stake, odds, notes."""
-    with _lock:
-        data = _load()
+    with _tx(user) as data:
         bet = next((b for b in data["bets"] if b["id"] == bet_id), None)
         if not bet:
             raise ValueError(f"no bet {bet_id}")
@@ -139,28 +216,82 @@ def update(bet_id: str, changes: dict) -> dict:
             bet["status"] = status
             if status != "cashout":
                 bet["cashout"] = None
-        _store(data)
         return bet
 
 
-def delete(bet_id: str):
-    with _lock:
-        data = _load()
+def delete(bet_id: str, user: str = OWNER):
+    with _tx(user) as data:
         data["bets"] = [b for b in data["bets"] if b["id"] != bet_id]
-        _store(data)
 
 
-def set_bankroll(amount) -> float:
-    with _lock:
-        data = _load()
+def set_bankroll(amount, user: str = OWNER) -> float:
+    with _tx(user) as data:
         data["starting_bankroll"] = _money(amount, "bankroll")
-        _store(data)
         return data["starting_bankroll"]
 
 
-def bankroll() -> float:
+def backup(keep_days: int = BACKUP_DAYS) -> Path:
+    """Copy the database to data/backups/bets-<date>.db (one per day, the latest
+    wins) and delete copies older than keep_days. It's on the same drive, so it
+    guards against a bad edit or a damaged file, not against losing the disk."""
+    folder = DB.parent / "backups"
+    folder.mkdir(parents=True, exist_ok=True)
+    today = datetime.now().date()
+    dest = folder / f"bets-{today.isoformat()}.db"
+    tmp = dest.with_suffix(".tmp")
+    src, out = _connect(), sqlite3.connect(tmp)
+    try:
+        src.backup(out)
+    finally:
+        out.close()
+        src.close()
+    tmp.replace(dest)
+    for old in folder.glob("bets-*"):
+        m = re.fullmatch(r"bets-(\d{4}-\d{2}-\d{2})\.(db|json)", old.name)
+        if m and datetime.strptime(m.group(1), "%Y-%m-%d").date() < today - timedelta(days=keep_days):
+            old.unlink()
+    return dest
+
+
+def members() -> list[dict]:
+    """Everyone invited to the public site, with how many bets they've saved."""
+    conn = _connect()
+    try:
+        return [{"email": e, "added_at": at, "bets": n} for e, at, n in conn.execute(
+            "SELECT m.email, m.added_at, COUNT(b.id) FROM members m LEFT JOIN bets b ON b.user = m.email "
+            "GROUP BY m.email ORDER BY m.email")]
+    finally:
+        conn.close()
+
+
+def is_member(email: str) -> bool:
+    conn = _connect()
+    try:
+        return conn.execute("SELECT 1 FROM members WHERE email = ?", (email,)).fetchone() is not None
+    finally:
+        conn.close()
+
+
+def add_member(email: str):
+    conn = _connect()
+    try:
+        conn.execute("INSERT OR IGNORE INTO members (email, added_at) VALUES (?, ?)", (email, _now()))
+    finally:
+        conn.close()
+
+
+def remove_member(email: str):
+    """Ends their access; their bets stay, in case they're invited back."""
+    conn = _connect()
+    try:
+        conn.execute("DELETE FROM members WHERE email = ?", (email,))
+    finally:
+        conn.close()
+
+
+def bankroll(user: str = OWNER) -> float:
     """Starting bankroll plus settled P&L: what stakes are sized from."""
-    data = _load()
+    data = _load(user)
     return round(data["starting_bankroll"] + sum(profit(b) or 0 for b in data["bets"]), 2)
 
 
@@ -180,8 +311,8 @@ def _totals(bets: list[dict]) -> dict:
     }
 
 
-def summary() -> dict:
-    data = _load()
+def summary(user: str = OWNER) -> dict:
+    data = _load(user)
     bets = data["bets"]
     for b in bets:
         b["profit"] = profit(b)

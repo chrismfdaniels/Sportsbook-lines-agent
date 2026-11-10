@@ -1,6 +1,6 @@
 // Network first, so you always see the newest lines when the Mac is reachable.
 // When it isn't (phone offline, Mac asleep), fall back to the last copy seen.
-const CACHE = "lines-v13";
+const CACHE = "lines-v15";
 const SLOW_MS = 8000;
 // One offline copy per endpoint for these, whatever the query (min %, method, scan profile)
 const ONE_COPY = ["/api/arbs", "/api/ev", "/api/settings", "/api/bets", "/api/live"];
@@ -56,6 +56,8 @@ self.addEventListener("fetch", (e) => {
   if (url.pathname.startsWith("/api/push/") || url.pathname === "/api/status") return;
   // Stats is a desktop page and always live; nothing to keep offline.
   if (url.pathname === "/stats" || url.pathname === "/api/stats") return;
+  // Who has access must always be the current list, never a saved one.
+  if (url.pathname === "/api/members") return;
   // A forced refresh must hit the books, never come from cache.
   if (url.searchParams.get("refresh") === "1") return;
   const key = ONE_COPY.includes(url.pathname) ? url.origin + url.pathname : e.request;

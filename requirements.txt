@@ -1,3 +1,4 @@
 requests>=2.32
 playwright>=1.48
 pywebpush>=2.0
+PyJWT[crypto]>=2.8

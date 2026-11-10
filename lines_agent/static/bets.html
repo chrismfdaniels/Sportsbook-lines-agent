@@ -97,10 +97,10 @@
 <body>
 <header>
   <div class="bar">
-    <a class="nav" href="/">‹ Lines</a>
-    <a class="nav" href="/ev">+EV Finder</a>
+    <a class="nav owner-only" href="/">‹ Lines</a>
+    <a class="nav owner-only" href="/ev">+EV Finder</a>
     <a class="nav" href="/live">Live</a>
-    <a class="nav desk-only" href="/stats">Stats</a>
+    <a class="nav desk-only owner-only" href="/stats">Stats</a>
     <h1>History</h1>
     <label class="f">Starting bankroll $<input id="startBank" type="number" inputmode="decimal" step="10" min="0"></label>
   </div>
@@ -113,9 +113,21 @@
   </section>
   <div class="filters">
     <div class="seg" role="group" aria-label="Status" id="fStatus"></div>
-    <div class="seg" role="group" aria-label="Type" id="fKind"></div>
+    <div class="seg owner-only" role="group" aria-label="Type" id="fKind"></div>
+    <button class="btn primary public-only" id="addBet">Add a bet</button>
   </div>
   <div class="list" id="list"></div>
+  <details class="panel owner-only" id="peoplePanel">
+    <summary>People with access</summary>
+    <div id="peopleStatus" style="color:var(--muted);font-size:13px;margin-top:8px"></div>
+    <div id="people" class="scroll" style="margin-top:8px;overflow-x:auto"></div>
+    <form id="inviteForm" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+      <input id="inviteEmail" type="email" required autocomplete="off" autocapitalize="off" placeholder="friend@example.com" aria-label="Email to invite"
+        style="flex:1;min-width:200px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--text);font:inherit;font-size:16px">
+      <button class="btn primary" id="inviteBtn">Invite</button>
+    </form>
+    <div id="inviteMsg" role="status" style="font-size:13px;margin-top:6px"></div>
+  </details>
   <details class="panel" id="booksPanel">
     <summary>By sportsbook</summary>
     <div id="books" style="margin-top:8px; overflow-x:auto"></div>
@@ -139,7 +151,27 @@
     <div class="foot"><button type="button" class="btn danger" id="eDelete">Delete</button><span class="sp"></span><button type="button" class="btn" id="eCancel">Cancel</button><button type="submit" class="btn primary" id="eSave">Save</button></div>
   </form>
 </dialog>
+<dialog class="edit public-only" id="addDlg" aria-labelledby="addTitle">
+  <form method="dialog" id="addForm">
+    <h2 id="addTitle">Add a bet</h2>
+    <div class="sub">Enter it as it appears on your bet slip.</div>
+    <div class="fields">
+      <label>League<select id="aLeague"></select></label>
+      <label>Sportsbook<select id="aBook"></select></label>
+      <label class="wide">Game<select id="aGame"></select></label>
+      <label>Market<select id="aMarket"><option value="moneyline">Moneyline</option><option value="spread">Spread</option><option value="total">Total</option></select></label>
+      <label>Your pick<select id="aSide"></select></label>
+      <label id="aLineWrap">Line<input id="aLine" autocomplete="off" placeholder="-3.5"></label>
+      <label>Odds<input id="aOdds" autocomplete="off" placeholder="-110"></label>
+      <label>Stake $<input id="aStake" type="number" inputmode="decimal" step="0.01" min="0.01"></label>
+      <label class="wide">Notes (optional)<input id="aNotes" maxlength="300"></label>
+    </div>
+    <div class="err" id="aErr" role="alert"></div>
+    <div class="foot"><span class="sp"></span><button type="button" class="btn" id="aCancel">Cancel</button><button type="submit" class="btn primary" id="aSave">Add bet</button></div>
+  </form>
+</dialog>
 <script>
+const PUBLIC = !!document.documentElement.dataset.public;
 // Every time on the page is US Mountain, whatever zone the device is in.
 const TZ = "America/Denver";
 // Safari says "Load failed" (Chrome "Failed to fetch") when the Mac can't be reached at all.
@@ -200,8 +232,8 @@ function renderTiles() {
     ["Settled profit / loss", signed(t.pnl), t.roi_pct != null ? `ROI ${t.roi_pct >= 0 ? "+" : ""}${t.roi_pct}% on ${money(t.staked)}` : "no settled bets yet", cls(t.pnl)],
     ["In open bets", money(t.open_stake), `${t.bets - t.settled} open`, ""],
     ["Record (W-L-P)", rec, `${t.settled} settled`, ""],
-    ["+EV bets", signed(d.ev.pnl), `expected ${signed(d.ev.expected)} from the edge · ${d.ev.settled} settled`, cls(d.ev.pnl)],
-    ["Arbitrage", signed(d.arb.pnl), `${d.arb.settled} legs settled`, cls(d.arb.pnl)],
+    ...(document.documentElement.dataset.public ? [] : [["+EV bets", signed(d.ev.pnl), `expected ${signed(d.ev.expected)} from the edge · ${d.ev.settled} settled`, cls(d.ev.pnl)],
+    ["Arbitrage", signed(d.arb.pnl), `${d.arb.settled} legs settled`, cls(d.arb.pnl)]]),
   ].map(([label, val, sub, c]) => `<div class="tile"><span>${label}</span><b class="${c}">${val}</b><small>${esc(sub)}</small></div>`).join("");
 }
 
@@ -284,7 +316,7 @@ function renderList() {
   const isOpen = (it) => it.bet ? it.bet.status === "open" : groups[it.group].some((b) => b.status === "open");
   const shown = items.filter((it) => st.status === "all" || (st.status === "open") === isOpen(it));
   if (!shown.length) {
-    $("list").innerHTML = `<div class="empty">${d.bets.length ? "No bets match these filters." : "No bets tracked yet. Press <b>Track bet</b> on a +EV card or <b>Track arb</b> on an arbitrage card after you place it."}</div>`;
+    $("list").innerHTML = `<div class="empty">${d.bets.length ? "No bets match these filters." : (PUBLIC ? "No bets yet. Press <b>Add a bet</b> after you place one." : "No bets tracked yet. Press <b>Track bet</b> on a +EV card or <b>Track arb</b> on an arbitrage card after you place it.")}</div>`;
     return;
   }
   $("list").innerHTML = shown.map((it) => {
@@ -368,7 +400,110 @@ let resizeT;
 window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => st.data && renderChart(), 150); });
 load();
 setInterval(() => st.data && renderList(), 60000);  // games go live and finish
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+// ---- Public site: adding a bet by hand, choosing the game from ESPN's schedule ----
+if (PUBLIC) {
+  const BOOK_NAMES = ["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "BetRivers", "theScore Bet", "Bally Bet", "Other"];
+  let games = [];
+  const opts = (list) => list.map(([v, n]) => `<option value="${esc(v)}">${esc(n)}</option>`).join("");
+  $("aLeague").innerHTML = opts(Object.entries(LEAGUE_SHORT));
+  $("aBook").innerHTML = opts(BOOK_NAMES.map((b) => [b, b]));
+  $("aLeague").value = safeGet("add.league", "NFL");
+  $("aBook").value = safeGet("add.book", "FanDuel");
+
+  function syncPick() {
+    const g = games[+$("aGame").value], total = $("aMarket").value === "total";
+    $("aSide").innerHTML = total ? opts([["over", "Over"], ["under", "Under"]]) : g ? opts([["away", g.away], ["home", g.home]]) : "";
+    $("aLineWrap").style.visibility = $("aMarket").value === "moneyline" ? "hidden" : "visible";
+    $("aLine").placeholder = total ? "47.5" : "-3.5";
+  }
+  async function loadGames() {
+    $("aGame").innerHTML = "<option>Loading games…</option>";
+    $("aGame").disabled = true;
+    games = [];
+    try {
+      games = (await api(`/api/games?league=${encodeURIComponent($("aLeague").value)}`)).games;
+      $("aGame").innerHTML = games.length
+        ? opts(games.map((g, i) => [i, `${g.away} @ ${g.home} · ${g.state === "in" ? "in progress" : when(g.start)}`]))
+        : "<option>No upcoming games</option>";
+      $("aErr").textContent = "";
+    } catch (e) {
+      $("aGame").innerHTML = "<option>Couldn't load games</option>";
+      $("aErr").textContent = errText(e);
+    }
+    $("aGame").disabled = !games.length;
+    syncPick();
+  }
+  $("addBet").addEventListener("click", () => {
+    $("aLine").value = $("aOdds").value = $("aStake").value = $("aNotes").value = "";
+    $("aErr").textContent = "";
+    $("addDlg").showModal();
+    loadGames();
+  });
+  $("aLeague").addEventListener("change", () => { safeSet("add.league", $("aLeague").value); loadGames(); });
+  $("aGame").addEventListener("change", syncPick);
+  $("aMarket").addEventListener("change", syncPick);
+  $("aCancel").addEventListener("click", () => $("addDlg").close());
+  $("addForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const g = games[+$("aGame").value], market = $("aMarket").value, o = parseOdds($("aOdds").value), stake = parseFloat($("aStake").value);
+    const line = parseFloat($("aLine").value.replace("−", "-"));
+    if (!g) { $("aErr").textContent = "Choose a game."; return; }
+    if (market !== "moneyline" && !Number.isFinite(line)) { $("aErr").textContent = "Enter the line from your bet slip, like -3.5 or 47.5."; return; }
+    if (!o) { $("aErr").textContent = "Enter American odds, like -110 or +150."; return; }
+    if (!(stake > 0)) { $("aErr").textContent = "Enter the amount you bet."; return; }
+    $("aSave").disabled = true;
+    try {
+      await api("/api/bets", { league: $("aLeague").value, away_team: g.away, home_team: g.home, start_time: g.start, market,
+        side: $("aSide").value, line: market === "moneyline" ? null : line, book: $("aBook").value, odds: o, stake, notes: $("aNotes").value });
+      safeSet("add.book", $("aBook").value);
+      $("addDlg").close();
+      await load();
+    } catch (err) {
+      $("aErr").textContent = `Couldn't save: ${errText(err)}`;
+    } finally {
+      $("aSave").disabled = false;
+    }
+  });
+}
+// ---- Private app only: who can sign in to the public site ----
+if (!PUBLIC) {
+  const say = (text, bad) => { $("inviteMsg").textContent = text; $("inviteMsg").style.color = bad ? "var(--neg)" : "var(--pos)"; };
+  async function loadPeople() {
+    try {
+      const d = await api("/api/members");
+      $("peopleStatus").textContent = d.problem || "Invited people can sign in with their email. Tell them the site's address after you invite them.";
+      $("inviteBtn").disabled = !!d.problem;
+      $("people").innerHTML = d.members.length ? `<table class="books"><thead><tr><th>Email</th><th>Bets</th><th>Invited</th><th></th></tr></thead><tbody>
+        ${d.members.map((m) => `<tr><td>${esc(m.email)}</td><td>${m.bets}</td><td>${esc(when(m.added_at))}</td><td><button type="button" class="btn danger" data-remove="${esc(m.email)}">Remove</button></td></tr>`).join("")}
+        </tbody></table>` : "";
+    } catch (e) {
+      $("peopleStatus").textContent = `Couldn't load: ${errText(e)}`;
+      $("inviteBtn").disabled = false;
+    }
+  }
+  $("peoplePanel").addEventListener("toggle", () => { if ($("peoplePanel").open) loadPeople(); });
+  $("inviteForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("inviteBtn").disabled = true;
+    say("");
+    try {
+      const out = await api("/api/members/invite", { email: $("inviteEmail").value });
+      $("inviteEmail").value = "";
+      say(`Invited ${out.invited}.`);
+    } catch (err) { say(errText(err), true); }
+    await loadPeople();
+  });
+  $("people").addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-remove]");
+    if (!b || !confirm(`Remove ${b.dataset.remove}? They lose access right away. Their bets are kept in case you invite them back.`)) return;
+    try {
+      await api("/api/members/remove", { email: b.dataset.remove });
+      say(`Removed ${b.dataset.remove}.`);
+    } catch (err) { say(errText(err), true); }
+    await loadPeople();
+  });
+}
+if ("serviceWorker" in navigator && !document.documentElement.dataset.public) navigator.serviceWorker.register("/sw.js").catch(() => {});
 </script>
 </body>
 </html>

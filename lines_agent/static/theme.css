@@ -57,3 +57,8 @@ main .tile { border-top: 4px solid var(--orange); }
 /* Desktop only (the Stats link): hidden on touch screens without a mouse or
    trackpad, i.e. phones and tablets */
 @media (hover: none) and (pointer: coarse) { .desk-only { display: none !important; } }
+
+/* Links to private pages, hidden on the public site. This is only tidiness:
+   public.py refuses those pages whatever the page shows. */
+html[data-public] .owner-only { display: none !important; }
+html:not([data-public]) .public-only { display: none !important; }

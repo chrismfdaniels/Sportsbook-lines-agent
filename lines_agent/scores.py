@@ -30,16 +30,18 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import requests
 
 from . import tracker
 from .arbitrage import decimal
-from .books.http import HEADERS
 from .matching import normalize, teams_match
-from .schedule import ET
 
 log = logging.getLogger("lines_agent")
+ET = ZoneInfo("America/New_York")  # ESPN's scoreboard days
+# Defined here so the public site, which imports this file, loads no scraping or scheduling code
+HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", "Accept": "application/json"}
 
 BASE = "https://site.api.espn.com/apis/site/v2/sports/"
 # league -> (scoreboard path, extra query)
@@ -278,10 +280,36 @@ def _projected(bet: dict, trend: str | None) -> float | None:
     return None
 
 
-def live() -> dict:
+def upcoming(league: str) -> list[dict]:
+    """Games not yet finished, for choosing one when adding a bet by hand: the next
+    week for football, the next three days for everything else."""
+    if league not in FEEDS:
+        raise ValueError("unknown league")
+    today = datetime.now(ET)
+    # ESPN only serves one date per request. Yesterday too, for late games still going.
+    days = [(today + timedelta(days=i)).strftime("%Y%m%d") for i in range(-1, 7 if league in FOOTBALL else 3)]
+
+    def fetch(day):
+        try:
+            return _scoreboard(league, day)
+        except Exception as e:
+            log.warning("upcoming games %s %s: %s", league, day, e)
+            return None
+
+    with ThreadPoolExecutor(max_workers=len(days)) as pool:
+        boards = list(pool.map(fetch, days))
+    if all(b is None for b in boards):
+        raise RuntimeError("no schedule available")
+    found = {g["id"]: g for b in boards for g in b or []
+             if g["state"] != "post" and g["status_name"] not in CALLED_OFF}
+    return [{"away": g["away"]["name"], "home": g["home"]["name"], "start": g["start"], "state": g["state"]}
+            for g in sorted(found.values(), key=lambda g: g["start"])]
+
+
+def live(user: str = tracker.OWNER) -> dict:
     """Open bets on games that have started, with the score and how each stands."""
     now = datetime.now(timezone.utc)
-    bets = [b for b in tracker.summary()["bets"] if b["status"] == "open" and b.get("league") in FEEDS]
+    bets = [b for b in tracker.summary(user)["bets"] if b["status"] == "open" and b.get("league") in FEEDS]
     started = []
     for b in bets:
         st = _ts(b.get("start_time", ""))

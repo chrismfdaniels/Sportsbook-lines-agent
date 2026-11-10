@@ -131,10 +131,10 @@
 <body>
 <header>
   <div class="bar">
-    <a class="nav" href="/">‹ Lines</a>
-    <a class="nav" href="/ev">+EV Finder</a>
+    <a class="nav owner-only" href="/">‹ Lines</a>
+    <a class="nav owner-only" href="/ev">+EV Finder</a>
     <a class="nav" href="/bets">History</a>
-    <a class="nav desk-only" href="/stats">Stats</a>
+    <a class="nav desk-only owner-only" href="/stats">Stats</a>
     <h1>Live</h1>
     <button class="btn" id="refresh">Refresh</button>
     <span class="upd" id="upd" role="status" aria-live="polite"></span>
@@ -426,7 +426,7 @@ $("refresh").addEventListener("click", load);
 setInterval(() => { if (document.visibilityState === "visible") load(); }, REFRESH_MS);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") load(); });
 load();
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+if ("serviceWorker" in navigator && !document.documentElement.dataset.public) navigator.serviceWorker.register("/sw.js").catch(() => {});
 </script>
 </body>
 </html>

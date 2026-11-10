@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The read-only public site (lines_agent/public.py). Restarts if it crashes;
+     stays stopped if data/public_site.json is missing or invalid. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sportsbook-lines-public</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/Chris/Desktop/Claude Projects/sportsbook-lines-agent/.venv/bin/python</string>
+    <string>-m</string>
+    <string>lines_agent.public</string>
+    <string>--port</string>
+    <string>8766</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/Chris/Desktop/Claude Projects/sportsbook-lines-agent</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/Chris/Library/Logs/sportsbook-lines-public.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/Chris/Library/Logs/sportsbook-lines-public.log</string>
+</dict>
+</plist>

@@ -46,7 +46,7 @@ class _Formatter(logging.Formatter):
         return redact(super().format(record))
 
 
-def setup(level: int = logging.INFO):
+def setup(level: int = logging.INFO, app_log: str = "app.log", error_log: str = "errors.log"):
     """Send every logger to the two daily files (and nothing to the console)."""
     root = logging.getLogger()
     root.setLevel(level)
@@ -55,7 +55,7 @@ def setup(level: int = logging.INFO):
     fmt = _Formatter(FORMAT)
     try:
         LOG_DIR.mkdir(parents=True, exist_ok=True)
-        for name, lvl in (("app.log", logging.DEBUG), ("errors.log", logging.WARNING)):
+        for name, lvl in ((app_log, logging.DEBUG), (error_log, logging.WARNING)):
             h = logging.handlers.TimedRotatingFileHandler(LOG_DIR / name, when="midnight", backupCount=0,
                                                           encoding="utf-8")
             h.setLevel(lvl)

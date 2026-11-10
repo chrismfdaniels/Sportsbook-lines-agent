@@ -83,7 +83,11 @@
 
   addEventListener("error", (ev) => {
     const t = ev.target;
-    if (t && t !== window && (t.src || t.href)) return report("resource", `couldn't load ${t.src || t.href}`);
+    if (t && t !== window && (t.src || t.href)) {
+      // Cloudflare adds its analytics script to pages; the public site deliberately blocks it
+      if ((t.src || "").includes("cloudflareinsights.com")) return;
+      return report("resource", `couldn't load ${t.src || t.href}`);
+    }
     report("script", `${ev.message} (${(ev.filename || "").split("/").pop()}:${ev.lineno}:${ev.colno})`);
   }, true);
   addEventListener("unhandledrejection", (ev) => {

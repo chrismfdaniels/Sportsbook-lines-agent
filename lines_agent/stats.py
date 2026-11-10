@@ -73,7 +73,7 @@ def disk() -> dict:
         ("Old snapshots", sum(p.stat().st_size for p in DATA.glob("lines_*.json"))),
         ("Lines cache", _size(DATA / "web_cache.json")),
         ("Logs", _size(logs.LOG_DIR) + _size(OLD_LOG)),
-        ("Bets & settings", sum(_size(DATA / f) for f in ("bets.json", "settings.json", "push_subscriptions.json"))),
+        ("Bets & settings", sum(_size(DATA / f) for f in ("app.db", "settings.json", "push_subscriptions.json"))),
         ("Code", code),
         ("Mac app", _size(MAC_APP)),
     ]
