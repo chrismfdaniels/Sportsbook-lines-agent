@@ -1,6 +1,6 @@
 // Network first, so you always see the newest lines when the Mac is reachable.
 // When it isn't (phone offline, Mac asleep), fall back to the last copy seen.
-const CACHE = "lines-v15";
+const CACHE = "lines-v16";
 const SLOW_MS = 8000;
 // One offline copy per endpoint for these, whatever the query (min %, method, scan profile)
 const ONE_COPY = ["/api/arbs", "/api/ev", "/api/settings", "/api/bets", "/api/live"];

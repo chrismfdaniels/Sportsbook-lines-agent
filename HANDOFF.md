@@ -52,7 +52,7 @@ launchctl kickstart -k gui/$(id -u)/com.sportsbook-lines-agent   # restart the s
 launchctl kickstart -k gui/$(id -u)/com.sportsbook-lines-public  # restart the service
 
 # Tests
-.venv/bin/python -m unittest tests.test_public
+.venv/bin/python -m unittest discover -s tests
 ```
 
 ## 3. Membership and login
@@ -130,6 +130,7 @@ Responses also carry a Content-Security-Policy, HSTS, `nosniff`, frame denial an
 | `macapp/` | Swift wrapper and menu bar app; `build.sh` installs it |
 | `launchd/` | Service definitions for both programs |
 | `tests/test_public.py` | 37 tests of login checks, allowlist, account separation, storage, invites, and refusal of other websites on the private server |
+| `tests/test_review.py` | 12 tests for bugs fixed in the Nov 9 code review: bad numbers, malformed settings, duplicate and empty refreshes, overlapping scans |
 | `data/` (ignored by Git) | Database, caches, history, settings, keys, `backups/` |
 
 ## 5. Deployment
@@ -199,7 +200,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.sportsbook-lines-pub
 7. Signed-in members who are refused see raw JSON such as `{"error":"not allowed"}`, as does any unknown page.
 8. Removing someone doesn't free their Cloudflare seat (50 free). Remove them from Cloudflare's user list if that ever matters.
 9. The Stats page doesn't include the public program's logs, or per-member numbers.
-10. Tests cover only the public site, accounts, storage and invites. Scrapers, +EV math and Live grading have no automated tests, and there is no CI.
+10. Tests cover the public site, accounts, storage, invites and the Nov 9 review fixes. Scrapers, +EV math and Live grading have no automated tests, and there is no CI.
 11. Paths are hard-coded in the launchd files, the Mac app targets arm64 only, and `push.py` defaults its contact to the Tailscale address.
 12. Dependencies are unpinned minimums. `cloudflared` has its own auto-update behavior.
 13. ESPN's scoreboard and the sportsbook endpoints are undocumented and can change without notice.

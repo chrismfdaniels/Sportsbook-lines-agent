@@ -79,6 +79,10 @@ _locks.update({PROPS_KEY + lg: threading.Lock() for lg in props.LEAGUES})
 # credits re-pulling lines the page already had.
 CACHE_FILE = ROOT / "data" / "web_cache.json"
 _save_lock = threading.Lock()
+# league -> (when its last scrape finished, books, markets), so a refresh that
+# waited behind another one can use its result instead of paying for it twice
+_scraped: dict[str, tuple[float, frozenset, frozenset]] = {}
+_scan_lock = threading.Lock()  # one "start a scan" at a time
 
 
 def _load_cache() -> dict[str, dict]:
@@ -121,15 +125,20 @@ def get_league(league: str, refresh: bool, books=None, markets=None) -> dict:
     # minute, long enough for the phone to give up ("Load failed").
     if not refresh and league in _cache:
         return _cache[league]
+    asked = time.time()
+    books = books or list(ALL_BOOKS)
+    markets = markets or list(settings.MARKETS)
+    # The sharp books ride along in the Odds API request for free (books.SHARP).
+    if any(b in VIA_ODDS_API for b in books):
+        books = books + [b for b in SHARP if b not in books]
     # One scrape per league at a time; concurrent refreshes wait and share the result.
     with _locks[league]:
+        done = _scraped.get(league)
+        if refresh and league in _cache and done and done[0] >= asked \
+                and set(books) <= done[1] and set(markets) <= done[2]:
+            return _cache[league]  # finished while this request waited, covering everything it asked for
         if refresh or league not in _cache:
             started = time.time()
-            books = books or list(ALL_BOOKS)
-            markets = markets or list(settings.MARKETS)
-            # The sharp books ride along in the Odds API request for free (books.SHARP).
-            if any(b in VIA_ODDS_API for b in books):
-                books = books + [b for b in SHARP if b not in books]
             lines, errors = agent.scrape(leagues=[league], book_names=books, include_live=True, markets=markets)
             agent.save(lines, ROOT / "data", snapshot=False)
             old = _cache.get(league) or {}
@@ -150,6 +159,7 @@ def get_league(league: str, refresh: bool, books=None, markets=None) -> dict:
                 "book_scraped_at": {**(old.get("book_scraped_at", {}) if partial else {}),
                                     **{b: now for b in books}},
             }
+            _scraped[league] = (time.time(), frozenset(books), frozenset(markets))
             _save_cache()
         return _cache[league]
 
@@ -199,9 +209,9 @@ def scan_arbs(min_profit: float, include_live: bool, refresh: bool, bankroll: fl
 
     def one(league):
         try:
-            # A scan without game-line markets still reads cached lines (for the page)
-            # but doesn't re-pull them.
-            return league, get_league(league, refresh and bool(markets), books, markets), None
+            # A scan without game-line markets or books still reads cached lines (for
+            # the page) but doesn't re-pull them; an empty list would mean "all".
+            return league, get_league(league, refresh and bool(markets) and bool(books), books, markets), None
         except Exception as e:
             return league, None, str(e)
 
@@ -274,7 +284,9 @@ def _ev_check(profile) -> tuple[list[dict], str]:
 
 
 def _profile_from_query(q: dict) -> dict | None:
-    """?leagues=NBA,MLB&books=...&markets=...&stats=... (each optional; "" means none)."""
+    """?leagues=NBA,MLB&books=...&markets=...&stats=... (each optional; "" means none).
+    q must come from parse_qs(..., keep_blank_values=True): without it "books=" is
+    dropped and reads as "every book"."""
     if q.get("use", [""])[0] == "manual":
         return settings.load()["manual"]
     keys = ("leagues", "books", "markets", "stats")
@@ -370,7 +382,7 @@ class Handler(BaseHandler):
             out = {"members": tracker.members(), "problem": invites.check()}
             return self._send(200, json.dumps(out).encode(), "application/json")
         if url.path == "/api/ev":
-            q = parse_qs(url.query)
+            q = parse_qs(url.query, keep_blank_values=True)
             try:
                 min_pct = _finite(q.get("min", [str(MIN_EV * 100)])[0])
             except ValueError:
@@ -387,25 +399,35 @@ class Handler(BaseHandler):
             name = url.path.lstrip("/")
             return self._send(200, (STATIC / name).read_bytes(), STATIC_FILES[name])
         if url.path == "/api/lines":
-            q = parse_qs(url.query)
+            q = parse_qs(url.query, keep_blank_values=True)
             league = q.get("league", ["NBA"])[0].upper()
             if league not in LEAGUES:
                 return self._send(400, b'{"error":"unknown league"}', "application/json")
-            prof = settings.clean_profile(_profile_from_query(q))
             try:
-                data = get_league(league, refresh=q.get("refresh", ["0"])[0] == "1",
-                                  books=prof["books"], markets=prof["markets"] or None)
+                prof = settings.clean_profile(_profile_from_query(q))
+            except ValueError as e:
+                return self._send(400, json.dumps({"error": str(e)}).encode(), "application/json")
+            refresh = q.get("refresh", ["0"])[0] == "1"
+            if refresh and (not prof["books"] or not prof["markets"]):
+                # An empty list would read as "all" below and spend credits on books you switched off
+                return self._send(400, b'{"error":"switch on at least one book and one game-line market in Scan controls"}',
+                                  "application/json")
+            try:
+                data = get_league(league, refresh=refresh, books=prof["books"], markets=prof["markets"])
             except Exception as e:
                 log.exception("scrape failed")
                 return self._send(500, json.dumps({"error": str(e)}).encode(), "application/json")
             return self._send(200, json.dumps(data).encode(), "application/json")
         if url.path == "/api/props":
-            q = parse_qs(url.query)
+            q = parse_qs(url.query, keep_blank_values=True)
             league = q.get("league", ["NBA"])[0].upper()
             if league not in props.LEAGUES:
                 return self._send(400, b'{"error":"no props for that league"}', "application/json")
             # refresh=1 re-scrapes props alone (free unless ODDS_API_PROPS is on)
-            prof = settings.clean_profile(_profile_from_query(q))
+            try:
+                prof = settings.clean_profile(_profile_from_query(q))
+            except ValueError as e:
+                return self._send(400, json.dumps({"error": str(e)}).encode(), "application/json")
             data = get_props(league, refresh=q.get("refresh", ["0"])[0] == "1",
                              books=prof["books"], stats=prof["stats"] or None) \
                 or {"league": league, "scraped_at": None, "props": [], "errors": {}}
@@ -421,7 +443,7 @@ class Handler(BaseHandler):
         if url.path == "/api/status":
             return self._send(200, json.dumps(schedule.state).encode(), "application/json")
         if url.path == "/api/arbs":
-            q = parse_qs(url.query)
+            q = parse_qs(url.query, keep_blank_values=True)
             try:
                 min_pct = _finite(q.get("min", ["1"])[0])
                 bankroll = _finite(q["bankroll"][0]) if "bankroll" in q else max(tracker.bankroll(), 0) or 100.0
@@ -429,7 +451,7 @@ class Handler(BaseHandler):
                 return self._send(400, b'{"error":"bad number"}', "application/json")
             data = scan_arbs(min_pct / 100, include_live=q.get("live", ["0"])[0] == "1",
                              refresh=q.get("refresh", ["0"])[0] == "1", bankroll=bankroll,
-                             profile=_profile_from_query(q))
+                             profile=_profile_from_query(q))  # query values are always lists of text
             return self._send(200, json.dumps(data).encode(), "application/json")
         self._send(404, b"not found", "text/plain")
 
@@ -459,9 +481,10 @@ class Handler(BaseHandler):
             elif url.path == "/api/estimate":
                 out = settings.estimate(body, _cache)
             elif url.path == "/api/scan":
-                if schedule.state["running"]:
-                    return self._send(409, b'{"error":"a scan is already running"}', "application/json")
-                _scan_now(MIN_ARB, notify=not body.get("quiet"))
+                with _scan_lock:  # two taps at once must not both start a scan
+                    if schedule.state["running"]:
+                        return self._send(409, b'{"error":"a scan is already running"}', "application/json")
+                    _scan_now(MIN_ARB, notify=not body.get("quiet"))
                 out = {"started": True}
             elif url.path == "/api/bets":
                 out = {"added": tracker.add(body.get("kind", "ev"), body.get("legs") or [], body.get("notes", ""))}

@@ -230,15 +230,16 @@ def phone_storage(cache: dict) -> dict:
                                             "apple-touch-icon.png", "favicon-32.png", "favicon.ico"))
     shell += _size(STATIC / "bets.html")  # cached again as /history
     feeds = len(json.dumps(tracker.summary())) + 6 * 1024  # bets, plus live/settings/arbs/ev (small)
-    lines = {k: len(json.dumps(v)) for k, v in cache.items() if not k.startswith("props:")}
-    props = {k: len(json.dumps(v)) for k, v in cache.items() if k.startswith("props:")}
+    items = list(cache.items())  # the server adds leagues while this runs
+    lines = {k: len(json.dumps(v)) for k, v in items if not k.startswith("props:")}
+    props = {k: len(json.dumps(v)) for k, v in items if k.startswith("props:")}
     return {"app": shell, "feeds": feeds, "lines_all": sum(lines.values()), "props_all": sum(props.values()),
             "most": shell + feeds + sum(lines.values()) + sum(props.values())}
 
 
 def freshness(cache: dict) -> list[dict]:
     out = []
-    for key, v in sorted(cache.items()):
+    for key, v in sorted(list(cache.items())):
         out.append({"name": key.replace("props:", "") + (" props" if key.startswith("props:") else ""),
                     "scraped_at": v.get("scraped_at"), "seconds": v.get("seconds"),
                     "rows": len(v.get("lines", v.get("props", []))), "errors": len(v.get("errors") or {})})

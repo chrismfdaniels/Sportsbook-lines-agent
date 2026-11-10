@@ -444,7 +444,8 @@ async function load(refresh = false) {
   const league = state.league;
   try {
     // A refresh pulls only the books and markets switched on in Scan controls.
-    const scope = refresh ? `&refresh=1&books=${ctl.manual.books.join(",")}${ctl.manual.markets.length ? "&markets=" + ctl.manual.markets.join(",") : ""}` : "";
+    // Both lists are always sent: a missing one would mean "all" to the Mac.
+    const scope = refresh ? `&refresh=1&books=${encodeURIComponent(ctl.manual.books.join(","))}&markets=${encodeURIComponent(ctl.manual.markets.join(","))}` : "";
     const [r] = await Promise.all([fetch(`/api/lines?league=${league}${scope}`), loadProps(league)]);
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || r.statusText);

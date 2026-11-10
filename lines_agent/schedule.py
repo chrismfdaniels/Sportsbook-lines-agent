@@ -27,6 +27,9 @@ log = logging.getLogger("lines_agent")
 state = {"times": list(DEFAULT_TIMES), "next_run": None, "last_run": None, "last_result": None,
          "running": False, "running_label": None}
 _changed = threading.Event()
+# One run at a time: a scheduled run that comes due during Scan Now waits for it,
+# rather than both running and the first to finish reporting "not running".
+_run_lock = threading.Lock()
 # Set by the web server: profile -> (+EV bets in the leagues a run just pulled, de-vig method)
 ev_check = None
 
@@ -61,6 +64,11 @@ def run_once(scan, min_profit: float, profile=None, label: str = "Scheduled scra
              notify: bool = True):
     """Pull the profile's lines, then announce +EV lines, and arbitrage too if arbs.
     Without notify, only the counts are recorded (for the page's own Scan button)."""
+    with _run_lock:
+        _run_once(scan, min_profit, profile, label, arbs, notify)
+
+
+def _run_once(scan, min_profit, profile, label, arbs, notify):
     state["running"], state["running_label"] = True, label
     started = datetime.now(MT)
     log.info("%s starting: %s", label, profile or "everything")

@@ -130,15 +130,29 @@ def _tx(user: str = OWNER):
         conn.close()
 
 
+def _number(v, what: str) -> float:
+    """A number from a request. true/false, text and Infinity are refused with a
+    message instead of crashing the request (int(Infinity) raises OverflowError)."""
+    if isinstance(v, bool) or not isinstance(v, (int, float, str)):
+        raise ValueError(f"{what} must be a number")
+    try:
+        x = float(v)
+    except ValueError:
+        raise ValueError(f"{what} must be a number")
+    if not math.isfinite(x):
+        raise ValueError(f"{what} must be a number")
+    return x
+
+
 def _odds(v) -> int:
-    o = int(v)
+    o = int(_number(v, "odds"))
     if -100 < o < 100:
         raise ValueError(f"bad American odds {v!r}")
     return o
 
 
 def _money(v, what: str) -> float:
-    x = round(float(v), 2)
+    x = round(_number(v, what), 2)
     if not math.isfinite(x):
         raise ValueError(f"{what} must be a number")
     if x < 0:

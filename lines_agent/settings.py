@@ -36,11 +36,15 @@ def full_profile() -> dict:
 def clean_profile(p: dict | None) -> dict:
     """Keep only known values, in canonical order. Missing keys mean "all"."""
     p = p or {}
+    if not isinstance(p, dict) or any(not isinstance(p.get(k, []), list) for k in ("leagues", "books", "markets", "stats")):
+        raise ValueError("a scan profile is {\"leagues\": [...], \"books\": [...], \"markets\": [...], \"stats\": [...]}")
     full = full_profile()
     return {k: [v for v in full[k] if v in p.get(k, full[k])] for k in full}
 
 
 def clean_run(r: dict) -> dict:
+    if not isinstance(r, dict):
+        raise ValueError("each scheduled run is {\"time\": \"HH:MM\", ...}")
     t = str(r.get("time", ""))
     if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", t):
         raise ValueError(f"bad time {t!r}; use 24-hour HH:MM")
@@ -79,6 +83,8 @@ def save(data: dict) -> dict:
     if "manual" in data:
         cur["manual"] = clean_profile(data["manual"])
     if "runs" in data:
+        if not isinstance(data["runs"], list):
+            raise ValueError("runs must be a list")
         if len(data["runs"]) > 24:
             raise ValueError("at most 24 scheduled runs")
         cur["runs"] = sorted((clean_run(r) for r in data["runs"]), key=lambda r: r["time"])

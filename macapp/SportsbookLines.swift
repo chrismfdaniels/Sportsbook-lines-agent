@@ -84,10 +84,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, WKNavi
 
     // The server isn't answering: start the launch agent, show a wait page, retry.
     func webView(_ webView: WKWebView, didFailProvisionalNavigation nav: WKNavigation!, withError error: Error) {
+        // A load replaced by another one (Reload, a click mid-load) or a link sent to the
+        // browser also lands here; the server is fine, so leave the page alone.
+        let e = error as NSError
+        if (e.domain == NSURLErrorDomain && e.code == NSURLErrorCancelled) || (e.domain == "WebKitErrorDomain" && e.code == 102) {
+            return
+        }
         retries += 1
         if retries == 1 { startServer() }
         let msg = retries > 30
-            ? "The lines server didn't start. Check ~/Library/Logs/sportsbook-lines-agent.log, then choose View → Reload."
+            ? "The lines server didn't start. Check ~/Library/Logs/SportsbookLines/errors.log, then choose View → Reload."
             : "Starting the lines server…"
         webView.loadHTMLString("""
             <html><body style="font:15px -apple-system;display:flex;height:90vh;align-items:center;justify-content:center;

@@ -1,7 +1,7 @@
 {
   "name": "Sportsbook Lines",
   "short_name": "Lines",
-  "description": "Moneylines, spreads, totals and cross-book arbitrage from five sportsbooks.",
+  "description": "Moneylines, spreads, totals and cross-book arbitrage from eight sportsbooks.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

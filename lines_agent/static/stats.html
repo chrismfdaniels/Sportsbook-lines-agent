@@ -160,7 +160,7 @@ function render(d) {
     ${tile("Phone data, Lines page", bytes(lines.now), `was ${bytes(lines.uncompressed)} uncompressed`)}
     ${tile("Requests, 24 h", num(t.requests), `${t.server_errors ? `<span class="bad">${t.server_errors} server errors</span>` : '<span class="ok">0 server errors</span>'} · ${t.slow} slow`)}
     ${tile("Book scrapes, 7 days", num(scrOk), scrBad ? `<span class="bad">${scrBad} failed</span>` : '<span class="ok">0 failed</span>')}
-    ${tile("Scheduled runs, 7 days", num(h.runs), h.run_failures ? `<span class="bad">${h.run_failures} failed</span>` : '<span class="ok">none failed</span>' + ` · next ${mt(d.schedule.next_run)}`)}
+    ${tile("Scheduled runs, 7 days", num(h.runs), (h.run_failures ? `<span class="bad">${h.run_failures} failed</span>` : '<span class="ok">none failed</span>') + ` · next ${mt(d.schedule.next_run)}`)}
     ${tile("Push alerts, 7 days", num(h.pushes), h.push_failed ? `<span class="bad">${h.push_failed} failed</span>` : `<span class="ok">${h.push_sent} delivered, 0 failed</span>`)}
   </div>`;
 

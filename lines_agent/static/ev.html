@@ -211,7 +211,7 @@ function render() {
   }
   st.shown = bets;
   $("list").innerHTML = bets.map((b, i) => {
-    const stake = bank * b.kelly_pct / 100 / 4;
+    const stake = Math.max(0, bank * b.kelly_pct / 100 / 4);
     const done = st.tracked.has(betKey(b));
     return `<article class="bet">
       <div class="bet-top"><div class="pick">${esc(pickText(b))}</div><div class="ev">+${b.ev_pct}%</div></div>
@@ -250,7 +250,7 @@ function openTrack(b) {
   const bank = Math.max(0, parseFloat($("bank").value) || 0);
   $("trackSub").textContent = `${pickText(b)} · ${b.book} · ${b.away_team} @ ${b.home_team} · ${when(b.start_time)}`;
   $("tOdds").value = odds(b.odds);
-  $("tStake").value = (bank * b.kelly_pct / 100 / 4).toFixed(2);
+  $("tStake").value = Math.max(0, bank * b.kelly_pct / 100 / 4).toFixed(2);
   $("tNotes").value = "";
   $("tErr").textContent = "";
   trackCalc();

@@ -222,7 +222,7 @@ The private server has no login, so it relies on listening only on this Mac and 
 - **Run:** `launchd/com.sportsbook-lines-public.plist` keeps it running on `127.0.0.1:8766`. Only Cloudflare's connector on this Mac talks to it.
 - **Logs:** `public.log` and `public-errors.log`, next to the others.
 - **Off switch:** `launchctl bootout gui/$(id -u)/com.sportsbook-lines-public` stops the public site at once and leaves the private app running. `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.sportsbook-lines-public.plist` turns it back on.
-- **Tests:** `.venv/bin/python -m unittest tests.test_public`
+- **Tests:** `.venv/bin/python -m unittest discover -s tests` (49 tests)
 
 The bets database is copied daily to `data/backups/` (kept 90 days). That's the same drive, so it protects against a bad edit or a damaged file, not against losing the disk.
 
