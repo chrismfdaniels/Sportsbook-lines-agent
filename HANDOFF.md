@@ -189,7 +189,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.sportsbook-lines-pub
 
 1. **The private server still has no login.** Attacks from other websites were closed on Nov 8 (section 3). Any device on the tailnet, or any program running on the Mac, can still use it fully. A very old browser that sends no `Sec-Fetch-Site` could still trigger a `GET` with `refresh=1`, which spends credits but can't read the result; iPhones on iOS 16.4 or later send the header.
 2. **A power cut needs someone at the Mac.** FileVault is on and `autoLoginUser` isn't set, so after an unplanned restart the Mac waits for a password before anything starts. `autorestart` alone won't bring the site back, which differs from what the owner was told earlier. The 2 AM restart on Nov 8 recovered without intervention, which is consistent with a macOS update's authenticated restart, but that is an inference. Options: accept it, or turn off FileVault and enable auto-login, which weakens protection if the Mac is stolen.
-3. **The live site runs uncommitted code.** Branch `public-site` has no commits of its own, so GitHub's `main` lacks the public site, database, invites and tests. Commit, push and merge.
+3. **The servers run whatever is on disk, not what's on GitHub.** Both launchd services start from the working folder, so an uncommitted edit goes live at the next restart. Work is on `main`, which matched GitHub's `main` on Nov 9; commit and push after each change to keep it that way. The `public-site` branch is merged and can be deleted.
 4. **Bets have no off-site backup.** Daily copies in `data/backups/` are on the same drive. `data/` isn't in Git.
 
 **Worth doing**
@@ -208,10 +208,9 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.sportsbook-lines-pub
 
 **Suggested next steps**
 
-1. Commit, push and merge the `public-site` branch.
-2. Set up off-site backups of `data/app.db`.
-3. Decide on the FileVault trade-off.
-4. Before charging anyone or showing Lines to members, check The Odds API's terms, the sportsbooks' terms and gambling rules with a lawyer.
+1. Set up off-site backups of `data/app.db`.
+2. Decide on the FileVault trade-off.
+3. Before charging anyone or showing Lines to members, check The Odds API's terms, the sportsbooks' terms and gambling rules with a lawyer.
 
 ## 8. What I could not verify
 
