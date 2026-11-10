@@ -275,7 +275,7 @@ const mtTime = (iso) => new Date(iso).toLocaleTimeString("en-US", { timeZone: TZ
 const mtDay = (d) => d.toLocaleDateString("en-US", { timeZone: TZ });
 // "1:05 PM MT" today, "Wed 1:05 PM MT" on another day
 const mtWhen = (iso) => (mtDay(new Date()) === mtDay(new Date(iso)) ? "" : new Date(iso).toLocaleDateString("en-US", { timeZone: TZ, weekday: "short" }) + " ") + mtTime(iso) + " MT";
-const BOOKS = ["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "BetRivers", "theScore Bet"];
+const BOOKS = ["FanDuel", "DraftKings", "BetMGM", "Caesars", "Fanatics", "BetRivers", "theScore Bet", "Bally Bet"];
 // [code, button label, full name]
 const LEAGUES = [
   ["NBA", "NBA", "NBA"],
@@ -728,7 +728,7 @@ const STAT_OPTS = [["assists", "Assists"], ["rebounds", "Rebounds"], ["steals", 
 const ALL_PROFILE = () => ({ leagues: LEAGUES.map(([c]) => c), books: [...BOOKS], markets: MARKET_OPTS.map(([k]) => k), stats: STAT_OPTS.map(([k]) => k) });
 // loaded: the saved controls and runs came from the Mac. Until then the page shows
 // defaults, and saving those would overwrite your real settings.
-const ctl = { manual: ALL_PROFILE(), apiBooks: ["DraftKings", "BetMGM", "Caesars", "Fanatics"], runs: [], loaded: false };
+const ctl = { manual: ALL_PROFILE(), apiBooks: ["DraftKings", "BetMGM", "Caesars", "Fanatics", "Bally Bet"], runs: [], loaded: false };
 const GROUPS = [
   ["leagues", "Sports", () => LEAGUES.map(([c, s, n]) => [c, s, n])],
   ["books", "Books", () => BOOKS.map((b) => [b, b + (ctl.apiBooks.includes(b) ? '<span class="api">API</span>' : ""),

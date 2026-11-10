@@ -249,7 +249,7 @@ def thescore_props(league: str, **_) -> list[Prop]:
     return out
 
 
-# ---------------------------------------------------------------- Odds API books (DraftKings, BetMGM, Caesars, Fanatics)
+# ---------------------------------------------------------------- Odds API books (DraftKings, BetMGM, Caesars, Fanatics, Bally Bet)
 ODDS_MARKETS = {"player_assists": "assists", "player_rebounds": "rebounds",
                 "player_steals": "steals", "player_turnovers": "turnovers"}
 

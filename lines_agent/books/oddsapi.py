@@ -1,8 +1,9 @@
 """The Odds API (the-odds-api.com): a licensed odds feed.
 
-DraftKings, BetMGM, Caesars and Fanatics block automated requests to their
-sites, so their lines come from this feed (Caesars and Fanatics need a paid
-plan). Each league pull costs a credit per market (3 for all of them) for up to
+DraftKings, BetMGM and Caesars block automated requests to their sites and
+Fanatics' site doesn't serve its own lines, so their lines come from this feed
+(Caesars and Fanatics need a paid plan). Bally Bet comes from here too, since it
+costs nothing extra in the same request. Each league pull costs a credit per market (3 for all of them) for up to
 10 books.
 """
 from __future__ import annotations
@@ -35,6 +36,7 @@ BOOK_KEYS = {
     "BetMGM": "betmgm",
     "Caesars": "williamhill_us",  # paid plans only
     "Fanatics": "fanatics",       # paid plans only
+    "Bally Bet": "ballybet",      # in the feed's "us2" bookmaker list; named directly, so no region is needed
     "Pinnacle": "pinnacle",       # sharp reference for the +EV finder
     # Also available here if you'd rather not run the direct scrapers:
     "FanDuel": "fanduel",
