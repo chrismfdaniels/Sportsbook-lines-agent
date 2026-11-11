@@ -331,9 +331,10 @@ def _scan_now(min_profit: float, notify: bool = True):
                      kwargs={"notify": notify}).start()
 
 
-# Names this server may be addressed by; PRIVATE_HOSTS in .env adds more (comma-separated).
+# Names this server may be addressed by; PRIVATE_HOSTS in .env adds more (comma-separated),
+# such as this Mac's Tailscale name.
 # Anything else is a website pointing its own domain at this Mac (DNS rebinding).
-PRIVATE_HOSTS = ("127.0.0.1", "localhost", "mac-mini.tail839a81.ts.net")
+PRIVATE_HOSTS = ("127.0.0.1", "localhost")
 
 
 class Handler(BaseHandler):

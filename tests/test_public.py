@@ -498,7 +498,10 @@ class PrivateServer(unittest.TestCase):
         same = {"Origin": self.base, "Content_Type": "application/json", "Sec_Fetch_Site": "same-origin"}
         self.assertEqual(self.req("/api/bets/update", "POST", {"id": "NOPE"}, **same)[0], 400)      # reached the app
         self.assertEqual(self.req("/api/bets/update", "POST", {"id": "NOPE"})[0], 400)              # Mac app: no browser headers
-        tail = "mac-mini.tail839a81.ts.net"
+        tail = "my-mac.example-tailnet.ts.net"
+        self.assertEqual(self.req("/api/bets", Host=tail, Sec_Fetch_Site="same-origin")[0], 403)   # unknown until listed
+        os.environ["PRIVATE_HOSTS"] = f"other.example, {tail}"
+        self.addCleanup(os.environ.pop, "PRIVATE_HOSTS", None)
         self.assertEqual(self.req("/api/bets", Host=tail, Sec_Fetch_Site="same-origin")[0], 200)
         self.assertEqual(self.req("/api/bets/update", "POST", {"id": "NOPE"}, Host=tail, Origin=f"https://{tail}")[0], 400)
         self.assertEqual(self.req("/bets", Sec_Fetch_Site="cross-site")[0], 200)                    # following a link to a page

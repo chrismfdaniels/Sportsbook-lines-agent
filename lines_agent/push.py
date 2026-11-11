@@ -23,7 +23,8 @@ ROOT = Path(__file__).resolve().parent.parent
 KEY_FILE = ROOT / "data" / "vapid_private.pem"
 SUBS_FILE = ROOT / "data" / "push_subscriptions.json"
 # Push services require a contact in the signed claim (a mailto: or https: URL).
-CONTACT = os.environ.get("PUSH_CONTACT", "https://mac-mini.tail839a81.ts.net")
+# Set PUSH_CONTACT in .env; read at send time because .env loads after import.
+DEFAULT_CONTACT = "mailto:admin@example.com"
 log = logging.getLogger("lines_agent")
 _lock = threading.Lock()
 
@@ -95,7 +96,7 @@ def send_all(title: str, body: str, url: str = "/?view=arbs", tag: str = "arbs")
     for sub in _load():
         try:
             # Short TTL: an arbitrage alert is useless hours later.
-            webpush(sub, payload, vapid_private_key=vapid, vapid_claims={"sub": CONTACT},
+            webpush(sub, payload, vapid_private_key=vapid, vapid_claims={"sub": os.environ.get("PUSH_CONTACT") or DEFAULT_CONTACT},
                     ttl=1800, timeout=20, headers={"Urgency": "high"})
             sent += 1
         except WebPushException as e:

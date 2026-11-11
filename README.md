@@ -180,7 +180,7 @@ The server only listens on this Mac. [Tailscale](https://tailscale.com) gives yo
    ```bash
    /Applications/Tailscale.app/Contents/MacOS/Tailscale serve --bg 8765
    ```
-   If it says HTTPS isn't enabled, open the link it prints, turn on HTTPS certificates, and run it again. It prints your app's address, e.g. `https://chris-mac.tail1234.ts.net`. The setting survives restarts. To turn it off: `... Tailscale serve --https=443 off`.
+   If it says HTTPS isn't enabled, open the link it prints, turn on HTTPS certificates, and run it again. It prints your app's address, e.g. `https://my-mac.tail1234.ts.net`. The setting survives restarts. To turn it off: `... Tailscale serve --https=443 off`.
 4. **iPhone, Safari:** open that address → Share → **Add to Home Screen**. (On Android: Chrome menu → **Install app**.)
 
 The Mac has to be on, awake and running Tailscale for the phone to get new lines.

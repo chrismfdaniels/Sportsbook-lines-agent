@@ -14,13 +14,13 @@ There is no cloud copy of the app. Both versions run on the same Mac and share o
 |---|---|---|
 | **Program** | `python -m lines_agent.web` | `python -m lines_agent.public` |
 | **Listens on** | `127.0.0.1:8765` | `127.0.0.1:8766` |
-| **Reached through** | The Mac itself, the Mac app, Tailscale Serve at `mac-mini.tail839a81.ts.net` (tailnet only) | `https://bets.us.com` via Cloudflare Tunnel and Access |
+| **Reached through** | The Mac itself, the Mac app, Tailscale Serve at this Mac's tailnet name (`PRIVATE_HOSTS` in `.env`) (tailnet only) | the public domain via Cloudflare Tunnel and Access |
 | **Keeps running via** | launchd agent `com.sportsbook-lines-agent` (starts at user login) | launchd agent `com.sportsbook-lines-public` (starts at user login), plus system daemon `com.cloudflare.cloudflared` (starts at boot) |
 | **Who can use it** | Anything that can reach it on the Mac or tailnet. There is no login, but other websites are refused ([section 3](#3-membership-and-login)) | The owner and invited members, each signed in through Cloudflare |
 | **Whose bets** | The `owner` account only | The signed-in person's own account; the owner's email maps to `owner` |
 | **Bets and members** | `data/app.db` (SQLite) | Same file |
 | **Other data** | `data/web_cache.json`, `data/lines_history.csv`, `data/settings.json`, `data/push_subscriptions.json`, `data/vapid_private.pem` | None. Live scores come straight from ESPN |
-| **Config** | `.env`: `ODDS_API_KEY`, optional `ODDS_API_PROPS`, `PUSH_CONTACT`, `PRIVATE_HOSTS`, and `CF_API_TOKEN`, `CF_ACCOUNT_ID`, `CF_ACCESS_GROUP_ID` | `data/public_site.json`: `team_domain`, `aud`, `owner_email`. Never loads `.env` |
+| **Config** | `.env`: `ODDS_API_KEY`, optional `ODDS_API_PROPS`, `PUSH_CONTACT` (push contact URL), `PRIVATE_HOSTS` (extra hostnames, such as the tailnet name), and `CF_API_TOKEN`, `CF_ACCOUNT_ID`, `CF_ACCESS_GROUP_ID` | `data/public_site.json`: `team_domain`, `aud`, `owner_email`. Never loads `.env` |
 | **Logs** (`~/Library/Logs/SportsbookLines/`) | `app.log`, `errors.log` | `public.log`, `public-errors.log` |
 | **Runtime libraries** | `requests`, `playwright` plus Chromium, `pywebpush`, `py-vapid`, `cryptography` | `requests`, `PyJWT[crypto]` (same `.venv`) |
 | **Spends Odds API credits** | Yes | No. A test confirms it loads no scraping or scheduling code |
@@ -144,7 +144,7 @@ Responses also carry a Content-Security-Policy, HSTS, `nosniff`, frame denial an
 3. If a change must reach the phone's offline copy, bump `CACHE` in `sw.js`.
 4. For Mac app changes, run `macapp/build.sh`.
 
-**Required settings** are listed in sections 2 and 3. The Cloudflare side has a tunnel route from `bets.us.com` to `http://127.0.0.1:8766`, an Access application for that hostname, and a policy that includes the allowed-people group.
+**Required settings** are listed in sections 2 and 3. The Cloudflare side has a tunnel route from the public domain to `http://127.0.0.1:8766`, an Access application for that hostname, and a policy that includes the allowed-people group.
 
 **Never connect the tunnel to port 8765.** The private app has no login.
 
