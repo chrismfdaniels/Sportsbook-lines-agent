@@ -62,3 +62,23 @@ main .tile { border-top: 4px solid var(--orange); }
    public.py refuses those pages whatever the page shows. */
 html[data-public] .owner-only { display: none !important; }
 html:not([data-public]) .public-only { display: none !important; }
+
+/* Filters bar (Lines and +EV): always open on wide screens. On phones the filters
+   fold behind one bar (tap it, or swipe the header down / up) so the results get
+   the screen. Markup: button.ftoggle, then .fwrap > .filters around the controls. */
+.fwrap, .filters { display: contents; }
+.ftoggle { display: none; }
+@media (max-width: 700px) {
+  .ftoggle { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border: 1px solid var(--line);
+             border-radius: 10px; background: var(--card); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+  .ftoggle svg { flex: none; width: 18px; height: 18px; }
+  .ftoggle .ft-label { font-weight: 700; flex: none; }
+  .ftoggle .ft-sum { flex: 1; min-width: 0; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ftoggle .ft-chev { flex: none; transition: transform .2s; }
+  .ftoggle[aria-expanded="true"] .ft-chev { transform: rotate(180deg); }
+  .fwrap { display: grid; grid-template-rows: 0fr; width: 100%; transition: grid-template-rows .22s ease; }
+  .fwrap.open { grid-template-rows: 1fr; }
+  .fwrap > .filters { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; min-height: 0; overflow: hidden; }
+  .fwrap:not(.open) > .filters { visibility: hidden; transition: visibility 0s .22s; }
+  .fwrap.open > .filters { padding-top: 2px; }
+}

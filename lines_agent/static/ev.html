@@ -78,24 +78,8 @@
   details.how code { background: var(--head); padding: 1px 4px; border-radius: 4px; }
   .loading { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin-right: 6px; animation: pulse 1s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .3; } }
-  /* Filters: always open on wide screens. On phones they fold behind the Filters bar
-     (tap it, or swipe the header down / up) so the results get the screen. */
-  .fwrap, .filters { display: contents; }
-  .ftoggle { display: none; }
   @media (max-width: 700px) {
     .bar { padding: 10px 12px; }
-    .ftoggle { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border: 1px solid var(--line);
-               border-radius: 10px; background: var(--card); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
-    .ftoggle svg { flex: none; width: 18px; height: 18px; }
-    .ftoggle .ft-label { font-weight: 700; flex: none; }
-    .ftoggle .ft-sum { flex: 1; min-width: 0; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .ftoggle .ft-chev { flex: none; transition: transform .2s; }
-    .ftoggle[aria-expanded="true"] .ft-chev { transform: rotate(180deg); }
-    .fwrap { display: grid; grid-template-rows: 0fr; width: 100%; transition: grid-template-rows .22s ease; }
-    .fwrap.open { grid-template-rows: 1fr; }
-    .fwrap > .filters { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; min-height: 0; overflow: hidden; }
-    .fwrap:not(.open) > .filters { visibility: hidden; transition: visibility 0s .22s; }
-    .fwrap.open > .filters { padding-top: 2px; }
     main { padding: 12px; }
     .status { padding: 0 12px 8px; font-size: 12px; }
     .nums { grid-template-columns: repeat(2, minmax(0, 1fr)); }

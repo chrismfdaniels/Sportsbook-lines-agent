@@ -146,9 +146,15 @@
   /* ---- Phone layout: bottom tabs (Lines / Arbitrage), one market at a time ---- */
   .tabbar, .mkt { display: none; }
   header { padding-top: env(safe-area-inset-top); }
+  .bar > a.nav { order: 10; }
   @media (max-width: 700px) {
     body { font-size: 15px; padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
     .bar { padding: 10px 12px; gap: 8px; }
+    .bar > a.nav { order: 0; padding: 6px 10px; }
+    .wide-only { display: none; }
+    .ftoggle { order: 1; }
+    .fwrap { order: 2; }
+    .fwrap > .filters { gap: 8px; }
     h1 { font-size: 17px; flex: 1; }
     .status { margin-left: 0; width: 100%; font-size: 12px; }
     .seg { order: 5; width: 100%; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
@@ -199,6 +205,16 @@
 <header>
   <div class="bar">
     <h1>Sportsbook Lines</h1>
+    <a class="btn nav" href="/ev" style="text-decoration:none">+EV<span class="wide-only"> Finder</span></a>
+    <a class="btn nav" href="/bets" style="text-decoration:none">History</a>
+    <a class="btn nav" href="/live" style="text-decoration:none">Live</a>
+    <a class="btn nav desk-only" href="/stats" style="text-decoration:none">Stats</a>
+    <button type="button" class="ftoggle" id="ftoggle" aria-expanded="false" aria-controls="fwrap">
+      <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h13M2.5 9h13M2.5 13.5h13"/></svg>
+      <span class="ft-label">Filters</span><span class="ft-sum" id="fsum"></span>
+      <svg class="ft-chev" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7l4.5 4.5L13.5 7"/></svg>
+    </button>
+    <div class="fwrap" id="fwrap"><div class="filters">
     <div class="seg" role="group" aria-label="League" id="leagues"></div>
     <div class="seg mkt" role="group" aria-label="Market" id="markets">
       <button data-market="moneyline">Moneyline</button>
@@ -208,11 +224,8 @@
     <button class="btn" id="refresh">Refresh</button>
     <label class="chk"><input type="checkbox" id="live"> Show live games</label>
     <input class="search" id="search" type="search" placeholder="Filter teams…">
-    <a class="btn" href="/ev" style="text-decoration:none">+EV Finder</a>
-    <a class="btn" href="/bets" style="text-decoration:none">History</a>
-    <a class="btn" href="/live" style="text-decoration:none">Live</a>
-    <a class="btn desk-only" href="/stats" style="text-decoration:none">Stats</a>
     <span class="status" id="status"></span>
+    </div></div>
   </div>
   <div class="updbar" id="updated" role="status" aria-live="polite"></div>
 </header>
@@ -631,6 +644,7 @@ function selectLeague(lg) {
   state.data = null;
   safeSet("league", lg);
   document.querySelectorAll("#leagues button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.league === lg));
+  renderSummary();
   render();
   load();
 }
@@ -936,6 +950,40 @@ setInterval(pollSchedule, 60000);
 // The home-screen app wakes from the background without reloading, so check right away.
 document.addEventListener("visibilitychange", () => { if (!document.hidden) pollSchedule(); });
 
+// ---- Phone filter bar: a one-line summary, folded away until wanted ----
+const phone = matchMedia("(max-width: 700px)");
+function renderSummary() {
+  const q = $("search").value.trim();
+  $("fsum").textContent = [LEAGUE_SHORT[state.league] || state.league,
+    cap(document.body.dataset.market || "moneyline"),
+    $("live").checked ? "with live" : "", q ? `“${q}”` : ""].filter(Boolean).join(" · ");
+}
+function setFilters(open, remember = true) {
+  $("fwrap").classList.toggle("open", open);
+  $("ftoggle").setAttribute("aria-expanded", open);
+  if (remember) safeSet("filters", open ? "1" : "0");
+}
+$("ftoggle").addEventListener("click", () => setFilters(!$("fwrap").classList.contains("open")));
+// Swipe down on the header to open the filters, up to close them
+{
+  let y0 = null, x0 = 0;
+  const head = document.querySelector("header");
+  head.addEventListener("touchstart", (e) => {
+    // Not from a text box, or from the league row, which scrolls sideways
+    y0 = phone.matches && !e.target.closest("input, select, .seg") ? e.touches[0].clientY : null;
+    x0 = e.touches[0].clientX;
+  }, { passive: true });
+  head.addEventListener("touchend", (e) => {
+    if (y0 == null) return;
+    const dy = e.changedTouches[0].clientY - y0, dx = Math.abs(e.changedTouches[0].clientX - x0);
+    y0 = null;
+    if (Math.abs(dy) > 40 && Math.abs(dy) > dx * 1.5) setFilters(dy > 0);
+  }, { passive: true });
+}
+$("search").addEventListener("input", renderSummary);
+$("live").addEventListener("change", renderSummary);
+setFilters(safeGet("filters", "0") === "1", false);  // folded by default on phones
+
 // ---- Phone controls: which view (bottom tabs) and which market ----
 function setView(v) {
   document.body.dataset.view = v;
@@ -947,6 +995,7 @@ function setMarket(m) {
   document.body.dataset.market = m;
   safeSet("market", m);
   document.querySelectorAll("#markets button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.market === m));
+  renderSummary();
 }
 document.querySelectorAll(".tabbar button").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
 document.querySelectorAll("#markets button").forEach((b) => b.addEventListener("click", () => setMarket(b.dataset.market)));
