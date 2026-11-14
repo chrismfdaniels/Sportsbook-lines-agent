@@ -78,8 +78,24 @@
   details.how code { background: var(--head); padding: 1px 4px; border-radius: 4px; }
   .loading { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); margin-right: 6px; animation: pulse 1s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .3; } }
+  /* Filters: always open on wide screens. On phones they fold behind the Filters bar
+     (tap it, or swipe the header down / up) so the results get the screen. */
+  .fwrap, .filters { display: contents; }
+  .ftoggle { display: none; }
   @media (max-width: 700px) {
     .bar { padding: 10px 12px; }
+    .ftoggle { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border: 1px solid var(--line);
+               border-radius: 10px; background: var(--card); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+    .ftoggle svg { flex: none; width: 18px; height: 18px; }
+    .ftoggle .ft-label { font-weight: 700; flex: none; }
+    .ftoggle .ft-sum { flex: 1; min-width: 0; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ftoggle .ft-chev { flex: none; transition: transform .2s; }
+    .ftoggle[aria-expanded="true"] .ft-chev { transform: rotate(180deg); }
+    .fwrap { display: grid; grid-template-rows: 0fr; width: 100%; transition: grid-template-rows .22s ease; }
+    .fwrap.open { grid-template-rows: 1fr; }
+    .fwrap > .filters { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; min-height: 0; overflow: hidden; }
+    .fwrap:not(.open) > .filters { visibility: hidden; transition: visibility 0s .22s; }
+    .fwrap.open > .filters { padding-top: 2px; }
     main { padding: 12px; }
     .status { padding: 0 12px 8px; font-size: 12px; }
     .nums { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -95,6 +111,12 @@
     <a class="back" href="/bets">History ›</a>
     <a class="back" href="/live">Live ›</a>
     <a class="back desk-only" href="/stats">Stats ›</a>
+    <button type="button" class="ftoggle" id="ftoggle" aria-expanded="false" aria-controls="fwrap">
+      <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5h13M2.5 9h13M2.5 13.5h13"/></svg>
+      <span class="ft-label">Filters</span><span class="ft-sum" id="fsum"></span>
+      <svg class="ft-chev" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 7l4.5 4.5L13.5 7"/></svg>
+    </button>
+    <div class="fwrap" id="fwrap"><div class="filters">
     <div class="seg" role="group" aria-label="League" id="leagues"></div>
     <div class="seg" role="group" aria-label="Market" id="markets"></div>
     <label class="f">Min EV <input id="min" type="number" inputmode="decimal" step="0.5" min="0" max="50" value="5"> %</label>
@@ -107,6 +129,7 @@
     </select></label>
     <label class="f">Sort <select id="sort"><option value="ev">EV</option><option value="start">Start time</option></select></label>
     <button class="btn primary" id="refresh">Re-pull lines</button>
+    </div></div>
   </div>
   <div class="status" id="status" role="status" aria-live="polite"></div>
 </header>
@@ -185,7 +208,40 @@ function sharpText(b, bk, v) {
   return `<b>${esc(bk)}</b> ${esc(a)} ${odds(v.odds)} / ${esc(o)} ${odds(v.other_odds)} · vig ${v.vig_pct}% · ${METHOD_NAME[b.method].toLowerCase()} fair ${(v.fair_prob[b.method] * 100).toFixed(1)}%`;
 }
 
+// ---- Phone filter bar: a one-line summary, folded away until wanted ----
+const phone = matchMedia("(max-width: 700px)");
+function renderSummary() {
+  const SHORT = { multiplicative: "Mult.", shin: "Shin", power: "Power", all: "All 3" };
+  const lg = st.league ? LEAGUE_SHORT[st.league] : "All";
+  const mk = st.market ? { moneyline: "ML", spread: "Spread", total: "Total" }[st.market] : "All";
+  const sort = $("sort").value === "start" ? " · by start" : "";
+  $("fsum").textContent = `${lg} · ${mk} · ≥${parseFloat($("min").value) || 0}% · ${SHORT[$("method").value] || ""}${sort}`;
+}
+function setFilters(open, remember = true) {
+  $("fwrap").classList.toggle("open", open);
+  $("ftoggle").setAttribute("aria-expanded", open);
+  if (remember) safeSet("ev.filters", open ? "1" : "0");
+}
+$("ftoggle").addEventListener("click", () => setFilters(!$("fwrap").classList.contains("open")));
+// Swipe down on the header to open the filters, up to close them
+{
+  let y0 = null, x0 = 0;
+  const head = document.querySelector("header");
+  head.addEventListener("touchstart", (e) => {
+    // Not from inside a text box or a select, where a drag means something else
+    y0 = phone.matches && !e.target.closest("input, select") ? e.touches[0].clientY : null;
+    x0 = e.touches[0].clientX;
+  }, { passive: true });
+  head.addEventListener("touchend", (e) => {
+    if (y0 == null) return;
+    const dy = e.changedTouches[0].clientY - y0, dx = Math.abs(e.changedTouches[0].clientX - x0);
+    y0 = null;
+    if (Math.abs(dy) > 40 && Math.abs(dy) > dx * 1.5) setFilters(dy > 0);
+  }, { passive: true });
+}
+
 function renderSegs() {
+  renderSummary();
   $("leagues").innerHTML = LEAGUES.map(([c, n]) => `<button data-league="${c}" aria-pressed="${st.league === c}">${n}</button>`).join("");
   $("markets").innerHTML = MARKETS.map(([c, n]) => `<button data-market="${c}" aria-pressed="${st.market === c}">${n}</button>`).join("");
 }
@@ -356,11 +412,13 @@ document.addEventListener("click", (e) => {
 $("refresh").addEventListener("click", () => load(true));
 $("min").addEventListener("change", () => { safeSet("ev.min", $("min").value); load(); });
 $("sort").addEventListener("change", () => { safeSet("ev.sort", $("sort").value); render(); });
+$("min").addEventListener("input", renderSummary);
 $("method").addEventListener("change", () => { safeSet("ev.method2", $("method").value); load(); });
 $("min").value = safeGet("ev.min", "5");
 $("sort").value = safeGet("ev.sort", "ev");
 $("method").value = safeGet("ev.method2", "all");
 if (!$("method").value) $("method").value = "all";
+setFilters(safeGet("ev.filters", "0") === "1", false);  // folded by default on phones
 renderSegs();
 renderStatus(`<span class="loading"></span>Loading…`);
 load();
