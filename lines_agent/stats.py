@@ -222,14 +222,14 @@ def _book(label: str) -> str:
     return "The Odds API" if label.startswith("OddsAPI") or label.startswith("Odds API") else label
 
 
-def phone_storage(cache: dict) -> dict:
+def phone_storage(cache: dict, summary: dict | None = None) -> dict:
     """What the phone app keeps for offline use: the app's pages and icons, one copy
     of each data feed, and the lines/props of each sport it has opened."""
     shell = sum(_size(STATIC / f) for f in ("index.html", "ev.html", "bets.html", "live.html", "theme.css",
                                             "report.js", "manifest.webmanifest", "icon-192.png", "icon-512.png",
                                             "apple-touch-icon.png", "favicon-32.png", "favicon.ico"))
     shell += _size(STATIC / "bets.html")  # cached again as /history
-    feeds = len(json.dumps(tracker.summary())) + 6 * 1024  # bets, plus live/settings/arbs/ev (small)
+    feeds = len(json.dumps(summary or tracker.summary())) + 6 * 1024  # bets, plus live/settings/arbs/ev (small)
     items = list(cache.items())  # the server adds leagues while this runs
     lines = {k: len(json.dumps(v)) for k, v in items if not k.startswith("props:")}
     props = {k: len(json.dumps(v)) for k, v in items if k.startswith("props:")}
@@ -246,8 +246,8 @@ def freshness(cache: dict) -> list[dict]:
     return out
 
 
-def bets() -> dict:
-    d = tracker.summary()
+def bets(d: dict | None = None) -> dict:
+    d = d or tracker.summary()
     t = d["total"]
     return {"bankroll": d["bankroll"], "starting": d["starting_bankroll"], "pnl": t["pnl"], "roi_pct": t["roi_pct"],
             "staked": t["staked"], "won": t["won"], "lost": t["lost"], "push": t["push"],
@@ -258,6 +258,7 @@ def bets() -> dict:
 
 
 def collect(cache: dict, started: float, schedule_state: dict) -> dict:
+    summary = tracker.summary()
     return {
         "at": datetime.now().astimezone().isoformat(timespec="seconds"),
         "disk": _cached("disk", 3600, disk),
@@ -265,9 +266,9 @@ def collect(cache: dict, started: float, schedule_state: dict) -> dict:
         "credits": {**oddsapi.quota},
         "traffic": _cached("traffic", 60, traffic),
         "health": (h := _cached("health", 60, health)),
-        "phone": _cached("phone", 300, lambda: phone_storage(cache)),
+        "phone": _cached("phone", 300, lambda: phone_storage(cache, summary)),
         "freshness": freshness(cache),
         "schedule": {k: schedule_state.get(k) for k in ("times", "next_run", "last_run", "running")},
-        "bets": bets(),
+        "bets": bets(summary),
     } | ({"credits": {**oddsapi.quota, "remaining": h["credits_last"], "from_log": True}}
          if oddsapi.quota.get("remaining") is None else {})

@@ -686,7 +686,8 @@ async function scanSelected() {
 }
 let arbTimer;
 for (const id of ["arbMin"]) $(id).addEventListener("input", () => { clearTimeout(arbTimer); arbTimer = setTimeout(() => loadArbs(), 400); });
-$("search").addEventListener("input", render);
+let searchT;  // redraw once typing pauses, not on every key (a big slate is hundreds of tables)
+$("search").addEventListener("input", () => { clearTimeout(searchT); searchT = setTimeout(render, 150); });
 $("live").checked = safeGet("live", "0") === "1";
 // ---- "Last update" banner: newest data on the server, how old it is, next run ----
 const upd = { lines: [], props: [], next: null, running: false, lastRun: null };

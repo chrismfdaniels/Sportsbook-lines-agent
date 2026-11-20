@@ -206,7 +206,7 @@ def thescore_props(league: str, **_) -> list[Prop]:
         for c in cards:
             ev = c.get("fallbackEvent") or (c.get("event") or {}).get("fallbackEvent") or {}
             link = (c.get("deepLink") or {}).get("webUrl")
-            if ev and link and ev.get("status") != "IN_PLAY" and _future(ev.get("startTime", "")):
+            if ev.get("id") and link and ev.get("status") != "IN_PLAY" and _future(ev.get("startTime", "")):
                 games[link] = ev
         for link, ev in games.items():
             sections: list = []

@@ -88,17 +88,43 @@ _scan_lock = threading.Lock()  # one "start a scan" at a time
 def _load_cache() -> dict[str, dict]:
     try:
         data = json.loads(CACHE_FILE.read_text())
-        return {k: v for k, v in data.items() if k in _locks}
+        data = {k: v for k, v in data.items() if k in _locks}
     except (OSError, ValueError):
         return {}
+    # Match the saved games again, so an improvement to matching.py applies at once
+    # rather than at the next pull (a few milliseconds; spends no credits)
+    for k, v in data.items():
+        if not k.startswith(PROPS_KEY) and v.get("lines"):
+            try:
+                v["lines"] = [l.to_dict() for l in unify_games([Line(**d) for d in v["lines"]])]
+            except (TypeError, KeyError):
+                pass  # an older layout; the next pull replaces it
+    return data
 
 
-def _save_cache():
+SAVE_DELAY = 2.0  # seconds; a scan finishing several leagues in a row writes the file once
+_save_timer: threading.Timer | None = None
+
+
+def _write_cache():
+    global _save_timer
     with _save_lock:
+        _save_timer = None
         CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
         tmp = CACHE_FILE.with_suffix(".tmp")
         tmp.write_text(json.dumps(dict(_cache)))
         tmp.replace(CACHE_FILE)
+
+
+def _save_cache():
+    """Write the cache to disk shortly. The file holds every league (a few MB), and
+    a scheduled run finishes six in a row; this writes it once instead of six times."""
+    global _save_timer
+    with _save_lock:
+        if _save_timer is None:
+            _save_timer = threading.Timer(SAVE_DELAY, _write_cache)
+            _save_timer.daemon = True
+            _save_timer.start()
 
 
 _cache: dict[str, dict] = _load_cache()

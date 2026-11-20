@@ -33,7 +33,16 @@ ALIASES = {
     "fau": "florida atlantic",
     "app state": "appalachian state",
     "southern miss": "southern mississippi",
-    "nc state": "north carolina state",
+    "nc": "north carolina",          # NC State, N.C. State, NC Central, NC A&T
+    "se missouri": "southeast missouri",
+    "se louisiana": "southeastern louisiana",
+    "gw": "george washington",
+    "csu": "cal state",              # CSU Northridge, CSU Bakersfield, CSU Fullerton
+    "college of charleston": "charleston",
+    "ut martin": "tennessee martin",
+    "tenn martin": "tennessee martin",
+    "arkansas little rock": "little rock",
+    "ualr": "little rock",
     "ul monroe": "louisiana monroe",
     "ulm": "louisiana monroe",
     "ul lafayette": "louisiana",
@@ -47,13 +56,17 @@ ALIAS_PREFIXES = sorted(ALIASES, key=len, reverse=True)
 
 def normalize(name: str) -> list[str]:
     s = name.lower().replace("&", " and ").replace("é", "e")
-    s = re.sub(r"[().'’,]", " ", s)
+    s = re.sub(r"\((w|d1)\)", " ", s)  # "(W)" for women's teams, "(D1)": not part of the name
+    s = s.replace(".", "")               # "N.C. State" -> "nc state", "Mt." -> "mt"
+    s = re.sub(r"[()'’,]", " ", s)
     s = re.sub(r"[-/]", " ", s)
     words = s.split()
     out = []
     for i, w in enumerate(words):
         if w == "st":
             w = "saint" if i == 0 else "state"
+        elif w == "mt" and i == 0:
+            w = "mount"
         elif w == "univ":
             w = "university"
         elif w == "oh" and i > 0:
@@ -81,6 +94,26 @@ def teams_match(a: list[str], b: list[str]) -> bool:
     if long_[: len(short)] == short:
         return True
     return len(short) >= 2 and a[0] == b[0] and a[-1] == b[-1]
+
+
+# Last words that aren't a nickname, so they can't identify a team on their own
+_NOT_NICKNAMES = {"state", "university", "college", "tech"}
+
+
+def same_nickname(a: list[str], b: list[str]) -> bool:
+    """'Little Rock Trojans' ~ 'Arkansas Little Rock Trojans', 'GW Revolutionaries' ~
+    'George Washington Revolutionaries': same nickname (last word). Only safe when
+    the opponent and the start time match too (see pair_match)."""
+    return bool(a and b) and a[-1] == b[-1] and len(a[-1]) >= 4 and a[-1] not in _NOT_NICKNAMES
+
+
+def pair_match(away: list[str], home: list[str], other_away: list[str], other_home: list[str]) -> bool:
+    """Same matchup: both teams match, or one matches and the other has the same
+    nickname. Two teams with one nickname can't both be playing one opponent at
+    one time, so a spelling the aliases miss still lines up."""
+    if teams_match(away, other_away):
+        return teams_match(home, other_home) or same_nickname(home, other_home)
+    return teams_match(home, other_home) and same_nickname(away, other_away)
 
 
 def _max_gap_h(league: str) -> float:
@@ -114,11 +147,11 @@ def unify_games(lines: list[Line]) -> list[Line]:
         for c in clusters:
             if c["league"] != league or abs(_ts(c["start"]) - _ts(start)) > _max_gap_h(league) * 3600:
                 continue
-            if teams_match(na, c["na"]) and teams_match(nh, c["nh"]):
+            if pair_match(na, nh, c["na"], c["nh"]):
                 target = c
                 break
             # Neutral-site games: books sometimes disagree on who is "home".
-            if teams_match(na, c["nh"]) and teams_match(nh, c["na"]):
+            if pair_match(na, nh, c["nh"], c["na"]):
                 target, swapped = c, True
                 break
         if target is None:

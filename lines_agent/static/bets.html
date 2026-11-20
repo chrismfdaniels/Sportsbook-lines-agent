@@ -208,8 +208,8 @@ const when = (iso) => iso ? new Date(iso).toLocaleString("en-US", { timeZone: TZ
 
 async function api(path, body) {
   const r = await fetch(path, body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {});
-  const out = await r.json();
-  if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
+  const out = await r.json().catch(() => ({}));  // an error page isn't JSON; say what failed instead
+  if (!r.ok) throw new Error(out.error || `The server answered ${r.status}`);
   return out;
 }
 

@@ -53,7 +53,7 @@ def fetch(league: str, **_) -> list[Line]:
     lines: dict[tuple, Line] = {}
     for card in cards:
         ev = card.get("fallbackEvent") or (card.get("event") or {}).get("fallbackEvent") or {}
-        if not ev:
+        if not ev.get("id"):  # one odd card mustn't sink the whole league
             continue
         away, home = _team(ev.get("awayParticipant")), _team(ev.get("homeParticipant"))
         if not (away and home):

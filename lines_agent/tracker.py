@@ -95,12 +95,21 @@ def _read(conn: sqlite3.Connection, user: str) -> dict:
 
 
 def _write(conn: sqlite3.Connection, user: str, data: dict):
+    """Save one user's data, touching only the rows that changed (settling one bet
+    writes one row, not all of them)."""
     conn.execute("INSERT INTO users (user, starting_bankroll) VALUES (?, ?) "
                  "ON CONFLICT (user) DO UPDATE SET starting_bankroll = excluded.starting_bankroll",
                  (user, data["starting_bankroll"]))
-    conn.execute("DELETE FROM bets WHERE user = ?", (user,))
+    stored = dict(conn.execute("SELECT id, data FROM bets WHERE user = ?", (user,)).fetchall())
+    rows = {b["id"]: json.dumps(b) for b in data["bets"]}
+    gone = [(user, i) for i in stored if i not in rows]
+    if gone:
+        conn.executemany("DELETE FROM bets WHERE user = ? AND id = ?", gone)
+    # New rows go on the end (rowid order is the order bets were added); changed rows keep their place
+    conn.executemany("UPDATE bets SET data = ? WHERE user = ? AND id = ?",
+                     [(s, user, i) for i, s in rows.items() if i in stored and stored[i] != s])
     conn.executemany("INSERT INTO bets (user, id, data) VALUES (?, ?, ?)",
-                     [(user, b["id"], json.dumps(b)) for b in data["bets"]])
+                     [(user, i, s) for i, s in rows.items() if i not in stored])
 
 
 def _load(user: str = OWNER) -> dict:
@@ -301,6 +310,11 @@ def remove_member(email: str):
         conn.execute("DELETE FROM members WHERE email = ?", (email,))
     finally:
         conn.close()
+
+
+def open_bets(user: str = OWNER) -> list[dict]:
+    """Unsettled bets, newest first, without the totals summary() adds up."""
+    return sorted((b for b in _load(user)["bets"] if b["status"] == "open"), key=lambda b: b["placed_at"], reverse=True)
 
 
 def bankroll(user: str = OWNER) -> float:

@@ -36,7 +36,7 @@ import requests
 
 from . import tracker
 from .arbitrage import decimal
-from .matching import normalize, teams_match
+from .matching import normalize, same_nickname, teams_match
 
 log = logging.getLogger("lines_agent")
 ET = ZoneInfo("America/New_York")  # ESPN's scoreboard days
@@ -166,6 +166,18 @@ def _same_team(name: str, team: dict) -> bool:
     return any(teams_match(n, normalize(x)) for x in team["names"])
 
 
+def _same_nick(name: str, team: dict) -> bool:
+    return same_nickname(normalize(name), normalize(team["name"]))
+
+
+def _pair(away: str, home: str, ga: dict, gh: dict) -> bool:
+    """The bet's teams are this ESPN pairing: both match, or one does and the other
+    has the same nickname (a spelling the aliases don't cover), as in matching.pair_match."""
+    if _same_team(away, ga):
+        return _same_team(home, gh) or _same_nick(home, gh)
+    return _same_team(home, gh) and _same_nick(away, ga)
+
+
 def _find(bet: dict, games: list[dict]) -> tuple[dict, bool] | None:
     """The ESPN game for a bet, and whether ESPN lists the teams the other way round."""
     start = _ts(bet.get("start_time", ""))
@@ -174,9 +186,9 @@ def _find(bet: dict, games: list[dict]) -> tuple[dict, bool] | None:
         gs = _ts(g["start"])
         if start and gs and abs((gs - start).total_seconds()) > 12 * 3600:
             continue
-        if _same_team(bet["away_team"], g["away"]) and _same_team(bet["home_team"], g["home"]):
+        if _pair(bet["away_team"], bet["home_team"], g["away"], g["home"]):
             swapped = False
-        elif _same_team(bet["away_team"], g["home"]) and _same_team(bet["home_team"], g["away"]):
+        elif _pair(bet["away_team"], bet["home_team"], g["home"], g["away"]):
             swapped = True   # neutral site, listed the other way
         else:
             continue
@@ -309,7 +321,7 @@ def upcoming(league: str) -> list[dict]:
 def live(user: str = tracker.OWNER) -> dict:
     """Open bets on games that have started, with the score and how each stands."""
     now = datetime.now(timezone.utc)
-    bets = [b for b in tracker.summary(user)["bets"] if b["status"] == "open" and b.get("league") in FEEDS]
+    bets = [b for b in tracker.open_bets(user) if b.get("league") in FEEDS]
     started = []
     for b in bets:
         st = _ts(b.get("start_time", ""))

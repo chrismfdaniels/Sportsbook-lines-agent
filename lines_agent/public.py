@@ -248,7 +248,10 @@ class PublicHandler(BaseHandler):
             league = parse_qs(urlparse(self.path).query).get("league", [""])[0]
             if league not in scores.FEEDS:
                 return self._json(400, {"error": "unknown league"})
-            return self._json(200, {"games": scores.upcoming(league)})
+            try:
+                return self._json(200, {"games": scores.upcoming(league)})
+            except RuntimeError:
+                return self._json(503, {"error": "ESPN's schedule isn't available right now. Try again in a minute."})
         if path == "/api/whoami":
             return self._json(200, {"email": self.who})
         self._json(404, {"error": "not found"})

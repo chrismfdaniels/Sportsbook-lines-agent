@@ -15,7 +15,9 @@ An empty "markets" skips game lines; an empty "stats" skips player props.
 from __future__ import annotations
 
 import json
+import logging
 import re
+import shutil
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +29,7 @@ from .models import LEAGUES
 FILE = Path(__file__).resolve().parent.parent / "data" / "settings.json"
 MARKETS = ("moneyline", "spread", "total")
 _lock = threading.Lock()
+log = logging.getLogger("lines_agent")
 
 
 def full_profile() -> dict:
@@ -73,7 +76,14 @@ def load(default_times=()) -> dict:
                 runs = [_from_eastern(r) for r in runs]
             return {"manual": clean_profile(data.get("manual")),
                     "runs": sorted((clean_run(r) for r in runs), key=lambda r: r["time"])}
-        except (OSError, ValueError):
+        except FileNotFoundError:
+            return _default(default_times)
+        except (OSError, ValueError, AttributeError, TypeError) as e:
+            # The next save writes the defaults over it, so keep a copy of what was there
+            bad = FILE.with_name("settings.unreadable.json")
+            if FILE.exists() and not bad.exists():
+                shutil.copy2(FILE, bad)
+            log.warning("Settings file unreadable (%s); using defaults. A copy is in %s", e, bad.name)
             return _default(default_times)
 
 
